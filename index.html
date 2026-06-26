@@ -1545,6 +1545,7 @@ function renderBiz(){
 
   var invs=S.bizInv[S.selB]||[];
   var profs=S.bizProfit[S.selB]||[];
+  var profPos = profs.filter(function(r) { return r.amount > 0; });
   var fifo=calcBizFIFO(S.selB);
   var totalInv=fifo.histInv;
   var totalGanado=fifo.histGanPos;
