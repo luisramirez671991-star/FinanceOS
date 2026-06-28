@@ -397,6 +397,10 @@ input,select,button,textarea{font-family:inherit;font-size:14px}
         <div class="hi"><div class="hilbl">Metas</div><div class="hival cg" id="hGoals">$0</div></div>
         <div class="hi"><div class="hilbl">Negocios neto</div><div class="hival ct" id="hBizN">$0</div></div>
       </div>
+      <div class="hrow" style="margin-top:6px;border-top:1px solid rgba(255,255,255,.08);padding-top:10px">
+        <div class="hi" style="background:rgba(52,211,153,.08)"><div class="hilbl">💵 Liquidez total</div><div class="hival cg" id="hLiquidez" style="font-size:15px">$0</div></div>
+        <div class="hi" style="background:rgba(96,165,250,.08)"><div class="hilbl">📈 Inversión total</div><div class="hival cb" id="hInversionTot" style="font-size:15px">$0</div></div>
+      </div>
     </div>
     <div class="g4" id="dStats"></div>
     <div id="assetBreakdown" style="margin-bottom:6px"></div>
@@ -798,8 +802,18 @@ function renderDash(){
   var invTot = S.invs.reduce(function(s,i){return s+(i.amount||0);},0);
   var debtTot = S.loans.filter(function(l){return l.dir==='debt';}).reduce(function(s,l){return s+Math.max(((l.total||0)-(l.paid||0)),0);},0);
   var creditTot = S.loans.filter(function(l){return l.dir==='credit';}).reduce(function(s,l){return s+Math.max(((l.total||0)-(l.paid||0)),0);},0);
-  var bizNet = S.bizList.reduce(function(acc,bz){return acc+calcBizFIFO(bz.id).valorTotal;},0);
+  var bizPendienteTot=0, bizLiquidezTot=0;
+  S.bizList.forEach(function(bz){
+    var f=calcBizFIFO(bz.id);
+    bizPendienteTot+=f.pendiente;
+    bizLiquidezTot+=f.liquidez;
+  });
+  var bizNet = bizPendienteTot+bizLiquidezTot;
   var pat = bkTot + goalTot + invTot - debtTot + creditTot + bizNet;
+
+  // ── Desglose Liquidez vs Inversión ──
+  var totalLiquidez = bkTot + goalTot + creditTot + Math.max(0,bizLiquidezTot);
+  var totalInversion = invTot + Math.max(0,bizPendienteTot);
 
   var ha = ge('heroAmt'); if(ha){ha.textContent=fmt(pat); ha.className='hval '+(pat>=0?'cg':'cr');}
   renderPatChart(pat);
@@ -809,6 +823,8 @@ function renderDash(){
   var hi = ge('hInv'); if(hi) hi.textContent=fmt(invTot);
   var hd = ge('hDebt'); if(hd) hd.textContent=fmt(debtTot);
   var hn = ge('hBizN'); if(hn){hn.textContent=fmt(bizNet); hn.className='hival '+(bizNet>=0?'ct':'cr');}
+  var hLq=ge('hLiquidez'); if(hLq) hLq.textContent=fmt(totalLiquidez);
+  var hInvT=ge('hInversionTot'); if(hInvT) hInvT.textContent=fmt(totalInversion);
 
   var ptx = S.pTx.filter(function(t){return inMonth(t,S.pM,S.pY);});
   var pinc = ptx.filter(function(t){return t.type==='income';}).reduce(function(s,t){return s+t.amount;},0);
@@ -1430,7 +1446,7 @@ function abrirRetiro(){
   var info=ge('retiroBizInfo');
   if(info) info.innerHTML=
     '<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>🏗️ Capital activo (no tocar):</span><span class="cb">'+fmt(fifo.pendiente)+'</span></div>'+
-    '<div style="display:flex;justify-content:space-between;font-weight:700"><span>💰 Ganancia disponible:</span><span class="'+(disponible>=0?'ct':'cr')+'">'+fmt(disponible)+'</span></div>';
+    '<div style="display:flex;justify-content:space-between;font-weight:700"><span>💵 Efectivo disponible:</span><span class="'+(disponible>=0?'ct':'cr')+'">'+fmt(disponible)+'</span></div>';
 
   var bsel=ge('retiroBankSel');
   if(bsel) bsel.innerHTML='<option value="">Selecciona una cuenta...</option>'+
@@ -1522,7 +1538,7 @@ function prepDelBiz(){
     if(fifo.valorTotal>0){
       v.innerHTML='⚠️ Este negocio tiene <b>'+fmt(fifo.valorTotal)+'</b> de valor sin retirar:<br>'+
         '· Capital en mercancía: <b>'+fmt(fifo.pendiente)+'</b><br>'+
-        '· Ganancia disponible: <b>'+fmt(Math.max(0,fifo.ganAcum))+'</b><br>'+
+        '· Efectivo del negocio: <b>'+fmt(Math.max(0,fifo.liquidez))+'</b><br>'+
         '<span style="color:var(--yw)">Considera retirar primero ese dinero a tu banco antes de eliminar.</span>';
     } else {
       v.innerHTML='✓ Este negocio no tiene capital ni ganancia pendiente de retirar.';
@@ -1548,21 +1564,37 @@ function calcBizFIFO(bizId){
     if(a.type!==b.type) return a.type==='inv'?-1:1;
     return 0;
   });
-  var pendiente=0,ganAcum=0,histInv=0,histGanPos=0,histRetiros=0;
+  // Modelo de 3 cuentas:
+  // pendiente   = capital activo en mercancía sin vender (un ACTIVO, no una deuda)
+  // liquidez    = efectivo que ya entró al negocio (de ventas) y aún no se retira ni reinvierte
+  // ganHist     = ganancia histórica reconocida (informativo, para ROI — nunca se gasta de aquí)
+  var pendiente=0, liquidez=0, ganHist=0, histInv=0, histGanPos=0, histRetiros=0;
   events.forEach(function(e){
     if(e.type==='inv'){
-      pendiente+=e.amount; histInv+=e.amount;
+      // Si hay efectivo del negocio disponible, se usa primero antes de pedir capital nuevo
+      var deLiquidez=Math.min(e.amount,liquidez);
+      liquidez-=deLiquidez;
+      pendiente+=e.amount;
+      histInv+=e.amount;
     } else {
       if(e.amount>=0){
-        var rec=Math.min(e.amount,pendiente);
-        pendiente-=rec; ganAcum+=(e.amount-rec); histGanPos+=e.amount;
+        // Toda venta entra como efectivo líquido de inmediato
+        liquidez+=e.amount;
+        var recuperado=Math.min(e.amount,pendiente);
+        pendiente-=recuperado;
+        ganHist+=(e.amount-recuperado);
+        histGanPos+=e.amount;
       } else {
-        ganAcum+=e.amount; histRetiros+=Math.abs(e.amount);
+        // Retiro a banco: sale efectivo del negocio
+        liquidez+=e.amount; // e.amount ya es negativo
+        histRetiros+=Math.abs(e.amount);
       }
     }
   });
-  return {pendiente:pendiente,ganAcum:ganAcum,histInv:histInv,histGanPos:histGanPos,
-    histRetiros:histRetiros,valorTotal:pendiente+ganAcum};
+  return {pendiente:pendiente,liquidez:liquidez,ganHist:ganHist,
+    histInv:histInv,histGanPos:histGanPos,histRetiros:histRetiros,
+    valorTotal:pendiente+liquidez,
+    ganAcum:liquidez}; // alias de compatibilidad con código existente
 }
 function renderBiz(){
   var chips=ge('bizChips');
@@ -1601,6 +1633,7 @@ function renderBiz(){
   var recovery=avgMonthly>0?Math.ceil(totalInv/avgMonthly):null;
 
   // Best month
+  var profPos=profs.filter(function(r){return r.amount>0;});
   var mMap={};
   profPos.forEach(function(r){var d=new Date(r.date+'T12:00:00');var k=(d.getMonth()+1)+'/'+d.getFullYear();mMap[k]=(mMap[k]||0)+r.amount;});
   var bestM=Object.entries(mMap).sort(function(a,b){return b[1]-a[1];})[0];
@@ -1619,12 +1652,12 @@ function renderBiz(){
 
   var bs=ge('bStats');
   if(bs) bs.innerHTML=
-    '<div class="sc"><div class="sl">🏗️ Capital activo (en mercancía)</div><div class="sv cb">'+fmt(fifo.pendiente)+'</div></div>'+
-    '<div class="sc"><div class="sl">💰 Ganancia disponible</div><div class="sv '+(fifo.ganAcum>=0?'cg':'cr')+'">'+fmt(fifo.ganAcum)+'</div></div>'+
+    '<div class="sc"><div class="sl">🏗️ Invertido en mercancía</div><div class="sv cb">'+fmt(fifo.pendiente)+'</div></div>'+
+    '<div class="sc"><div class="sl">💵 Efectivo del negocio</div><div class="sv '+(fifo.liquidez>=0?'cg':'cr')+'">'+fmt(fifo.liquidez)+'</div></div>'+
     '<div class="sc"><div class="sl">💎 Valor total del negocio</div><div class="sv ct">'+fmt(fifo.valorTotal)+'</div></div>'+
     '<div class="sc"><div class="sl">📈 ROI histórico</div><div class="sv cy">'+retorno+'%</div></div>';
   var bsHint=ge('bStatsHint');
-  if(bsHint) bsHint.innerHTML='<div style="font-size:11px;color:var(--soft);background:var(--c2);border-radius:8px;padding:8px 10px;margin-bottom:8px">🏗️ <b>Capital activo</b> = dinero en mercancía sin vender aún (es un activo, no una deuda). 💰 <b>Ganancia disponible</b> = lo que ya puedes retirar a tu banco.</div>';
+  if(bsHint) bsHint.innerHTML='<div style="font-size:11px;color:var(--soft);background:var(--c2);border-radius:8px;padding:8px 10px;margin-bottom:8px">🏗️ <b>Invertido en mercancía</b> = valor de lo que compraste y aún no has vendido (es un activo, no una deuda). 💵 <b>Efectivo del negocio</b> = dinero que ya entró por ventas, listo para retirar a tu banco o reinvertir. Capital invertido + Efectivo = valor total de tu negocio en este momento.</div>';
 
   var bs2=ge('bStats2');
   if(bs2) bs2.innerHTML=
