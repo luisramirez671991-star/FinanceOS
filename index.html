@@ -97,7 +97,7 @@ input,select,button,textarea{font-family:inherit;font-size:14px}
 .tg{display:flex;background:var(--c1);border:1px solid var(--b);border-radius:9px;padding:3px;margin-bottom:11px}
 .tgb{flex:1;padding:8px;border:none;border-radius:7px;font-size:12px;font-weight:700;background:none;color:var(--mut);cursor:pointer;transition:all .15s}
 .tgb.on{background:var(--card);color:var(--text)}
-.tgb.on.g{color:#34d399}.tgb.on.r{color:#fb7185}.tgb.on.b{color:#60a5fa}
+.tgb.on.g{color:#34d399}.tgb.on.r{color:#fb7185}.tgb.on.b{color:#60a5fa}.tgb.on.y{color:#fbbf24}
 
 /* CHIPS / PILLS */
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:11px}
@@ -214,19 +214,20 @@ input,select,button,textarea{font-family:inherit;font-size:14px}
     <div class="lerr" id="lerr">Contraseña incorrecta</div>
     <span class="llink" onclick="showM('mRec')">¿Olvidaste tu contraseña?</span>
     <div class="lhint">Contraseña inicial: <b style="color:var(--acc)">1234</b> · Cámbiala en ⚙️ Ajustes</div>
-    <div style="margin-top:14px;border-top:1px solid var(--c3);padding-top:12px;text-align:center">
-      <span style="font-size:11px;color:var(--soft)">¿No puedes entrar de ninguna forma?</span><br>
-      <button onclick="emergencyReset()" style="font-size:12px;color:#f43f5e;background:none;border:1px solid rgba(244,63,94,.4);border-radius:8px;padding:6px 14px;cursor:pointer;margin-top:6px">🔑 Restablecer acceso</button>
-    </div>
+
   </div>
 </div>
 
 <!-- MODALS -->
 <div class="ov" id="mRec" style="display:none" onclick="if(event.target===this)hideM('mRec')">
 <div class="mbox"><div class="mt">🔑 Recuperar acceso <button class="mc" onclick="hideM('mRec')">✕</button></div>
-<div class="fg"><input class="fi" id="recC" placeholder="Correo o celular registrado"/></div>
-<button class="btn bp bfu" onclick="doRec()">Verificar</button>
+<label class="fl" style="display:block;margin-bottom:4px">PIN de emergencia (4 dígitos)</label>
+<input class="fi" id="recPin" type="password" maxlength="4" inputmode="numeric" placeholder="••••" style="text-align:center;font-size:24px;letter-spacing:10px;margin-bottom:10px"/>
+<label class="fl" style="display:block;margin-bottom:4px">Nueva contraseña</label>
+<input class="fi" id="recNewPass" type="password" placeholder="Mínimo 4 caracteres" style="margin-bottom:4px"/>
+<button class="btn bp bfu" onclick="doRec()" style="margin-top:8px">✓ Cambiar contraseña</button>
 <div id="recMsg" style="margin-top:10px;font-size:12px;text-align:center;display:none"></div>
+<p style="font-size:11px;color:var(--soft);text-align:center;margin-top:10px">Configura tu PIN en ⚙️ Ajustes → Seguridad</p>
 </div></div>
 
 <div class="ov" id="mBank" style="display:none" onclick="if(event.target===this)hideM('mBank')">
@@ -379,6 +380,7 @@ input,select,button,textarea{font-family:inherit;font-size:14px}
     <div class="tb-btns">
       <button class="tbb" onclick="showAdvisor()">🤖 Asesor</button>
       <button class="tbb hi" onclick="showM('mExport')">💾 Drive</button>
+      <button class="tbb" onclick="showPg('pg-s')">⚙️ Ajustes</button>
       <button class="tbb" onclick="doLogout()">🚪</button>
     </div>
   </div>
@@ -509,18 +511,24 @@ input,select,button,textarea{font-family:inherit;font-size:14px}
 
   <!-- SETTINGS -->
   <div class="pg" id="pg-s">
-    <div class="card" style="margin-bottom:10px">
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--soft);margin-bottom:12px">🔐 Cambiar contraseña</div>
-      <div class="fg"><label class="fl">Contraseña actual</label><input class="fi" type="password" id="oldP" placeholder="••••"/></div>
-      <div class="fg"><label class="fl">Nueva contraseña</label><input class="fi" type="password" id="newP" placeholder="••••"/></div>
-      <div class="fg"><label class="fl">Confirmar nueva</label><input class="fi" type="password" id="cfmP" placeholder="••••"/></div>
-      <button class="btn bp bfu" onclick="chPass()">Cambiar contraseña</button>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <button class="btn bs bsm" onclick="showPg('pg-d')">← Inicio</button>
+      <div style="font-size:16px;font-weight:700">⚙️ Ajustes</div>
     </div>
     <div class="card" style="margin-bottom:10px">
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--soft);margin-bottom:12px">📱 Recuperación de cuenta</div>
-      <div class="fg"><label class="fl">Número celular</label><input class="fi" id="sPhone" type="tel" placeholder="+52 000 000 0000"/></div>
-      <div class="fg"><label class="fl">Correo electrónico</label><input class="fi" id="sEmail" type="email" placeholder="tucorreo@gmail.com"/></div>
-      <button class="btn bp bfu" onclick="saveCont()">Guardar contacto</button>
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--soft);margin-bottom:12px">🔐 Seguridad</div>
+      <label class="fl" style="display:block;margin-bottom:6px">Cambiar contraseña</label>
+      <div class="fg"><input class="fi" type="password" id="oldP" placeholder="Contraseña actual"/></div>
+      <div class="fg"><input class="fi" type="password" id="newP" placeholder="Nueva contraseña"/></div>
+      <div class="fg"><input class="fi" type="password" id="cfmP" placeholder="Confirmar nueva"/></div>
+      <button class="btn bp bfu" onclick="chPass()">Cambiar contraseña</button>
+      <hr style="border-color:var(--c3);margin:16px 0">
+      <label class="fl" style="display:block;margin-bottom:6px">🔑 PIN de emergencia</label>
+      <p style="font-size:11px;color:var(--soft);margin-bottom:10px;line-height:1.5">Úsalo si algún día olvidas tu contraseña. Te deja poner una nueva sin perder tus datos.</p>
+      <div id="pinStatusMsg" style="font-size:12px;margin-bottom:8px"></div>
+      <div class="fg"><input class="fi" type="password" id="newPin" maxlength="4" inputmode="numeric" placeholder="Nuevo PIN (4 dígitos)" style="text-align:center;letter-spacing:8px"/></div>
+      <div class="fg"><input class="fi" type="password" id="cfmPin" maxlength="4" inputmode="numeric" placeholder="Confirmar PIN" style="text-align:center;letter-spacing:8px"/></div>
+      <button class="btn bg bfu" onclick="setPin()">Guardar PIN</button>
     </div>
     <div class="card" style="margin-bottom:10px">
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--soft);margin-bottom:12px">💰 Límites de presupuesto mensual</div>
@@ -529,7 +537,7 @@ input,select,button,textarea{font-family:inherit;font-size:14px}
     </div>
     <div class="card" style="margin-bottom:10px">
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--soft);margin-bottom:12px">🧮 Calculadora financiera</div>
-      <div class="tg" style="margin-bottom:12px"><button class="tgb on g" id="cTabI" onclick="setCalcTab('int')">📈 Interés compuesto</button><button class="tgb r" id="cTabL" onclick="setCalcTab('loan')">🏦 Cuota préstamo</button></div>
+      <div class="tg" style="margin-bottom:12px"><button class="tgb on g" id="cTabI" onclick="setCalcTab('int')">📈 Interés compuesto</button><button class="tgb r" id="cTabL" onclick="setCalcTab('loan')">🏦 Cuota préstamo</button><button class="tgb y" id="cTabP" onclick="setCalcTab('plazos')">💸 Préstamo a plazos</button></div>
       <div id="calcInt">
         <div class="fr"><div class="fg"><label class="fl">Capital inicial</label><input class="fi" id="cCapital" type="number" placeholder="100000"/></div><div class="fg"><label class="fl">Tasa anual %</label><input class="fi" id="cRate" type="number" placeholder="10"/></div></div>
         <div class="fr"><div class="fg"><label class="fl">Años</label><input class="fi" id="cYears" type="number" placeholder="5"/></div><div class="fg"><label class="fl">Aportación mensual</label><input class="fi" id="cMonthly" type="number" placeholder="0"/></div></div>
@@ -541,6 +549,13 @@ input,select,button,textarea{font-family:inherit;font-size:14px}
         <div class="fg"><label class="fl">Plazo (meses)</label><input class="fi" id="lMonths" type="number" placeholder="36"/></div>
         <button class="btn bp bfu" onclick="calcCuota()">Calcular cuota</button>
         <div id="calcLoanResult" style="margin-top:10px"></div>
+      </div>
+      <div id="calcPlazos" style="display:none">
+        <p style="font-size:11px;color:var(--soft);margin-bottom:10px;line-height:1.5">Para préstamos de prestamista con pagos fijos cada cierto número de días (muy común en México). Te dice la tasa real que estás pagando, que casi nunca te dicen.</p>
+        <div class="fr"><div class="fg"><label class="fl">Monto prestado</label><input class="fi" id="pCapital" type="number" placeholder="7000"/></div><div class="fg"><label class="fl">Pago por periodo</label><input class="fi" id="pPago" type="number" placeholder="952"/></div></div>
+        <div class="fr"><div class="fg"><label class="fl">Número de pagos</label><input class="fi" id="pNumPagos" type="number" placeholder="10"/></div><div class="fg"><label class="fl">Días entre pagos</label><input class="fi" id="pDias" type="number" placeholder="14"/></div></div>
+        <button class="btn bp bfu" onclick="calcPlazos()">Calcular tasa real</button>
+        <div id="calcPlazosResult" style="margin-top:10px"></div>
       </div>
     </div>
     <div class="card">
@@ -579,6 +594,7 @@ var ICOS = {Alimentación:'🛒',Transporte:'🚗',Vivienda:'🏠',Salud:'💊',
 
 var S = {
   pass: ld('pass','1234'),
+  recoveryPin: ld('recoveryPin', null),
   contact: ld('contact',{phone:'',email:''}),
   banks: ld('banks',[]),
   goals: ld('goals',[]),
@@ -604,7 +620,7 @@ var S = {
 };
 
 function persist(){
-  sv('pass',S.pass); sv('contact',S.contact);
+  sv('pass',S.pass); sv('recoveryPin',S.recoveryPin); sv('contact',S.contact);
   sv('banks',S.banks); sv('goals',S.goals);
   sv('invs',S.invs); sv('loans',S.loans);
   sv('pTx',S.pTx); sv('budgets',S.budgets);
@@ -651,11 +667,6 @@ function getV(id){var el=ge(id);return el?el.value:'';}
 // ─────────────────────────────────────────────────────────────
 // AUTH
 // ─────────────────────────────────────────────────────────────
-function emergencyReset(){
-  if(!confirm('⚠️ Esto borrará TODOS los datos guardados en este navegador y restablecerá la contraseña a 1234.\n\nSi tienes respaldo en Google Drive, podrás restaurarlo después desde Ajustes → Drive.\n\n¿Continuar?'))return;
-  localStorage.clear();
-  location.reload();
-}
 function doLogin(){
   var pass = getV('lpass');
   if(pass === S.pass){
@@ -678,16 +689,30 @@ function doLogout(){
 }
 
 function doRec(){
-  var c = getV('recC').trim();
+  var pin = getV('recPin').trim();
+  var newPass = getV('recNewPass').trim();
   var msg = ge('recMsg');
   msg.style.display = 'block';
-  if(c && (c===S.contact.phone || c===S.contact.email)){
-    msg.style.color = '#34d399';
-    msg.textContent = 'Tu contraseña es: '+S.pass;
-  } else {
+  if(!S.recoveryPin){
     msg.style.color = '#fb7185';
-    msg.textContent = 'Contacto no encontrado. Verifica en ⚙️ Ajustes.';
+    msg.textContent = 'No has configurado un PIN de emergencia todavía. Ve a ⚙️ Ajustes → Seguridad para crearlo.';
+    return;
   }
+  if(pin !== S.recoveryPin){
+    msg.style.color = '#fb7185';
+    msg.textContent = 'PIN incorrecto.';
+    return;
+  }
+  if(!newPass || newPass.length<4){
+    msg.style.color = '#fb7185';
+    msg.textContent = 'La nueva contraseña debe tener mínimo 4 caracteres.';
+    return;
+  }
+  S.pass = newPass;
+  persist();
+  msg.style.color = '#34d399';
+  msg.textContent = '✓ Contraseña cambiada. Ya puedes entrar con tu nueva contraseña.';
+  setV('recPin',''); setV('recNewPass','');
 }
 
 function chPass(){
@@ -699,10 +724,25 @@ function chPass(){
   setV('oldP',''); setV('newP',''); setV('cfmP','');
 }
 
-function saveCont(){
-  S.contact.phone = getV('sPhone');
-  S.contact.email = getV('sEmail');
-  persist(); toast('Contacto guardado ✓');
+function renderPinStatus(){
+  var el = ge('pinStatusMsg');
+  if(!el) return;
+  if(S.recoveryPin){
+    el.innerHTML = '<span style="color:#34d399">✓ PIN configurado</span>';
+  } else {
+    el.innerHTML = '<span style="color:#fbbf24">⚠️ Sin PIN configurado — hazlo ahora por seguridad</span>';
+  }
+}
+function setPin(){
+  var p = getV('newPin').trim();
+  var c = getV('cfmPin').trim();
+  if(!/^\d{4}$/.test(p)){toast('El PIN debe ser de 4 dígitos numéricos','#f43f5e');return;}
+  if(p!==c){toast('Los PIN no coinciden','#f43f5e');return;}
+  S.recoveryPin = p;
+  persist();
+  setV('newPin',''); setV('cfmPin','');
+  renderPinStatus();
+  toast('✓ PIN de emergencia guardado');
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -731,7 +771,7 @@ function showPg(id){
 
   if(id==='pg-a') renderAna();
   if(id==='pg-adv') renderAdv();
-  if(id==='pg-s'){renderBudEdit();setV('sPhone',S.contact.phone);setV('sEmail',S.contact.email);}
+  if(id==='pg-s'){renderBudEdit();renderPinStatus();}
 }
 
 function showAdvisor(){showPg('pg-adv');}
@@ -741,7 +781,7 @@ function showAdvisor(){showPg('pg-adv');}
 // ─────────────────────────────────────────────────────────────
 function initApp(){
   setV('pDate',today()); setV('bDate',today());
-  setV('sPhone',S.contact.phone); setV('sEmail',S.contact.email);
+  renderPinStatus();
   if(!S.selB && S.bizList.length) S.selB = S.bizList[0].id;
   setV('biDate',today()); setV('bpDate',today());
   renderDash();
@@ -1545,7 +1585,6 @@ function renderBiz(){
 
   var invs=S.bizInv[S.selB]||[];
   var profs=S.bizProfit[S.selB]||[];
-  var profPos = profs.filter(function(r) { return r.amount > 0; });
   var fifo=calcBizFIFO(S.selB);
   var totalInv=fifo.histInv;
   var totalGanado=fifo.histGanPos;
@@ -1820,8 +1859,10 @@ function renderProyeccion(){
 function setCalcTab(t){
   ge('calcInt').style.display=t==='int'?'block':'none';
   ge('calcLoan').style.display=t==='loan'?'block':'none';
+  ge('calcPlazos').style.display=t==='plazos'?'block':'none';
   ge('cTabI').className='tgb '+(t==='int'?'on g':'');
   ge('cTabL').className='tgb '+(t==='loan'?'on g':'');
+  ge('cTabP').className='tgb '+(t==='plazos'?'on y':'');
 }
 function calcInteres(){
   var C=parseFloat(getV('cCapital'))||0;
@@ -1844,6 +1885,53 @@ function calcInteres(){
     '<div class="sc"><div class="sl">Retorno</div><div class="sv cy">'+roi+'%</div></div>'+
     '</div>';
 }
+
+function _resolverTasaPeriodo(P, pago, n){
+  // Bisección: encuentra r tal que P = pago*(1-(1+r)^-n)/r
+  var lo=0.00001, hi=3.0;
+  for(var i=0;i<100;i++){
+    var mid=(lo+hi)/2;
+    var pv = pago*(1-Math.pow(1+mid,-n))/mid;
+    if(pv>P) lo=mid; else hi=mid;
+  }
+  return (lo+hi)/2;
+}
+function calcPlazos(){
+  var P=parseFloat(getV('pCapital'))||0;
+  var pago=parseFloat(getV('pPago'))||0;
+  var n=parseFloat(getV('pNumPagos'))||0;
+  var dias=parseFloat(getV('pDias'))||14;
+  if(!P||!pago||!n||!dias){toast('Llena todos los campos','#f43f5e');return;}
+  var totalPago=pago*n;
+  var totalInt=totalPago-P;
+  var pctSobrePrestamo=(totalInt/P)*100;
+  var rPeriodo=_resolverTasaPeriodo(P,pago,n);
+  var periodosPorAnio=365/dias;
+  var tasaAnualEfectiva=(Math.pow(1+rPeriodo,periodosPorAnio)-1)*100;
+  var plazoDias=n*dias;
+  var msg='', msgColor='';
+  if(tasaAnualEfectiva<40){msg='✅ Tasa razonable, similar a una tarjeta de crédito.';msgColor='var(--gr)';}
+  else if(tasaAnualEfectiva<100){msg='⚠️ Tasa alta. Compárala con otras opciones si puedes.';msgColor='var(--yw)';}
+  else {msg='🚨 Tasa extremadamente alta — típica de préstamos informales. El costo real es mucho mayor de lo que parece a simple vista.';msgColor='var(--rd)';}
+  var el=ge('calcPlazosResult');
+  if(el) el.innerHTML=
+    '<div class="g4">'+
+    '<div class="sc"><div class="sl">Total a pagar</div><div class="sv cb">'+fmt(totalPago)+'</div></div>'+
+    '<div class="sc"><div class="sl">Total de interés</div><div class="sv cr">'+fmt(totalInt)+'</div></div>'+
+    '<div class="sc"><div class="sl">% sobre el préstamo</div><div class="sv cy">'+pctSobrePrestamo.toFixed(1)+'%</div></div>'+
+    '<div class="sc"><div class="sl">Plazo total</div><div class="sv">'+plazoDias+' días</div></div>'+
+    '</div>'+
+    '<div style="background:var(--c2);border-radius:10px;padding:12px;margin-top:10px">'+
+      '<div style="font-size:11px;color:var(--soft);margin-bottom:4px">Tasa de interés por periodo ('+dias+' días)</div>'+
+      '<div style="font-size:18px;font-weight:800;color:var(--ct)">'+(rPeriodo*100).toFixed(2)+'%</div>'+
+    '</div>'+
+    '<div style="background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.25);border-radius:10px;padding:12px;margin-top:8px">'+
+      '<div style="font-size:11px;color:var(--soft);margin-bottom:4px">💡 Tasa Anual Efectiva real (lo que de verdad estás pagando al año)</div>'+
+      '<div style="font-size:24px;font-weight:800;color:var(--rd)">'+tasaAnualEfectiva.toFixed(1)+'%</div>'+
+    '</div>'+
+    '<div style="font-size:12px;color:'+msgColor+';margin-top:8px;font-weight:600;line-height:1.5">'+msg+'</div>';
+}
+
 function calcCuota(){
   var P=parseFloat(getV('lCapital'))||0;
   var r=parseFloat(getV('lRate'))||0;
@@ -2053,7 +2141,7 @@ function renderAdv(){
 // EXPORT / IMPORT
 // ─────────────────────────────────────────────────────────────
 function expJSON(){
-  var data={v:6,exp:new Date().toISOString(),pass:S.pass,contact:S.contact,banks:S.banks,goals:S.goals,invs:S.invs,loans:S.loans,pTx:S.pTx,budgets:S.budgets,bizList:S.bizList,bizTx:S.bizTx,bizInv:S.bizInv,bizProfit:S.bizProfit,recs:S.recs,patHistory:S.patHistory,notes:S.notes,transfers:S.transfers};
+  var data={v:6,exp:new Date().toISOString(),pass:S.pass,recoveryPin:S.recoveryPin,contact:S.contact,banks:S.banks,goals:S.goals,invs:S.invs,loans:S.loans,pTx:S.pTx,budgets:S.budgets,bizList:S.bizList,bizTx:S.bizTx,bizInv:S.bizInv,bizProfit:S.bizProfit,recs:S.recs,patHistory:S.patHistory,notes:S.notes,transfers:S.transfers};
   var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   var a=cel('a'); a.href=URL.createObjectURL(blob); a.download='FinanceOS_'+today()+'.json'; a.click();
   toast('Respaldo descargado ✓');
@@ -2082,7 +2170,7 @@ function impJSON(input){
       var d=JSON.parse(e.target.result);
       if(!d.v){toast('Archivo inválido o de versión anterior incompatible','#f43f5e');return;}
       if(!confirm('¿Importar? Se reemplazarán todos los datos actuales.'))return;
-      var keys=['pass','contact','banks','goals','invs','loans','pTx','budgets','bizList','bizTx','bizInv','bizProfit','recs','patHistory','notes','transfers'];
+      var keys=['pass','recoveryPin','contact','banks','goals','invs','loans','pTx','budgets','bizList','bizTx','bizInv','bizProfit','recs','patHistory','notes','transfers'];
       keys.forEach(function(k){if(d[k]!==undefined)sv(k,d[k]);});
       toast('Importado ✓ Recargando...');
       setTimeout(function(){location.reload();},1500);
@@ -2190,7 +2278,7 @@ function drvFindFile(){
 function drvSave(){
   if(!GD.tok)return;
   drvSt('⏳ Guardando en Drive...','#fbbf24');
-  var data={v:6,saved:new Date().toISOString(),pass:S.pass,contact:S.contact,banks:S.banks,goals:S.goals,invs:S.invs,loans:S.loans,pTx:S.pTx,budgets:S.budgets,bizList:S.bizList,bizTx:S.bizTx,bizInv:S.bizInv,bizProfit:S.bizProfit,recs:S.recs,patHistory:S.patHistory,notes:S.notes,transfers:S.transfers};
+  var data={v:6,saved:new Date().toISOString(),pass:S.pass,recoveryPin:S.recoveryPin,contact:S.contact,banks:S.banks,goals:S.goals,invs:S.invs,loans:S.loans,pTx:S.pTx,budgets:S.budgets,bizList:S.bizList,bizTx:S.bizTx,bizInv:S.bizInv,bizProfit:S.bizProfit,recs:S.recs,patHistory:S.patHistory,notes:S.notes,transfers:S.transfers};
   var body=JSON.stringify(data);
   drvFindFile().then(function(file){
     var p;
@@ -2230,10 +2318,10 @@ function drvLoad(isAutoLoad){
     })
     .then(function(d){
       if(!d.v){drvSt('❌ Datos inválidos en Drive','#f43f5e');return;}
-      var keys=['pass','contact','banks','goals','invs','loans','pTx','budgets','bizList','bizTx','bizInv','bizProfit','recs','patHistory','notes','transfers'];
+      var keys=['pass','recoveryPin','contact','banks','goals','invs','loans','pTx','budgets','bizList','bizTx','bizInv','bizProfit','recs','patHistory','notes','transfers'];
       keys.forEach(function(k){if(d[k]!==undefined)sv(k,d[k]);});
       // Reload state
-      S.pass=ld('pass','1234');S.contact=ld('contact',{phone:'',email:''});
+      S.pass=ld('pass','1234');S.recoveryPin=ld('recoveryPin',null);S.contact=ld('contact',{phone:'',email:''});
       S.banks=ld('banks',[]);S.goals=ld('goals',[]);S.invs=ld('invs',[]);S.loans=ld('loans',[]);
       S.pTx=ld('pTx',[]);S.budgets=ld('budgets',{});S.bizList=ld('bizList',[]);
       S.bizTx=ld('bizTx',{});S.bizInv=ld('bizInv',{});S.bizProfit=ld('bizProfit',{});
