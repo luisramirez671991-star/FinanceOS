@@ -246,16 +246,31 @@ input,select,button,textarea{font-family:inherit;font-size:14px}
 }
 
 
-/* Mobile: single column stacked */
+/* ── MOBILE layout ─────────────────────────────────────────── */
 @media(max-width:767px){
+  /* App layout */
+  #app { display:block !important; padding-bottom:62px; }
+  .snav { display:none !important; }
+  .main-wrap { display:block; width:100%; }
+  .pages-wrap { display:block; overflow:visible; }
+  /* Bottom nav - controlled by JS on login/logout */
+  /* Pages: single column */
+  .pg { padding:12px 12px 10px; max-width:100%; margin:0; }
+  .pg.on { display:block; }
+  /* Dashboard: stack columns */
   .d-desk-grid { display:flex; flex-direction:column; gap:0; }
   .d-col-right { order:-1; }
-  .d-col-left {}
+  /* Hero responsive */
   .hero .hrow { flex-wrap:wrap; }
-  .hi { min-width:calc(50% - 4px); }
-  /* Ensure sidebar stays hidden on mobile */
-  .snav { display:none !important; }
-  .main-wrap { width:100%; }
+  .hi { min-width:calc(50% - 4px); flex:1; }
+  /* Topbar visible on mobile */
+  .topbar { display:flex !important; position:sticky; top:0; z-index:100; }
+  .topbar .topbar-logo { display:block !important; }
+  /* Modals from bottom on mobile */
+  .ov { align-items:flex-end; padding:0; }
+  .mbox { border-radius:18px 18px 0 0 !important; max-height:92vh; }
+  /* 2-col stats on mobile */
+  .g4 { grid-template-columns:repeat(2,1fr) !important; }
 }
 
 </style>
@@ -582,7 +597,7 @@ input,select,button,textarea{font-family:inherit;font-size:14px}
               <span style="font-size:16px">🔮</span>
               <span style="font-size:10px;color:var(--soft)">Simulador</span>
             </button>
-            <button class="btn bs bsm" style="padding:10px;flex-direction:column;gap:3px" onclick="showPg('pg-f')">
+            <button class="btn bs bsm" style="padding:10px;flex-direction:column;gap:3px" onclick="showPg('pg-a')">
               <span style="font-size:16px">📊</span>
               <span style="font-size:10px;color:var(--soft)">Herramientas</span>
             </button>
@@ -995,7 +1010,7 @@ function setViewOnlyPin(){
 // ─────────────────────────────────────────────────────────────
 var PAGE_MAP = {'pg-d':'bn-d','pg-p':'bn-p','pg-b':'bn-b','pg-a':'bn-a'};
 
-var _SNMAP={'pg-d':'sn-d','pg-p':'sn-p','pg-b':'sn-b','pg-a':'sn-a','pg-s':'sn-s'};
+var _SNMAP={'pg-d':'sn-d','pg-p':'sn-p','pg-b':'sn-b','pg-a':'sn-a','pg-s':'sn-s','pg-adv':'sn-a'};
 function showPg(id){
   document.querySelectorAll('.pg').forEach(function(p){p.classList.remove('on');});
   document.querySelectorAll('.bni').forEach(function(b){
