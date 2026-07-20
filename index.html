@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- FinanceOS + Vida diaria (LifeOS integrado) — build 2026-07-19-v2 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"/>
@@ -3938,6 +3939,10 @@ function drvLoad(isAutoLoad){
       S.pTx=ld('pTx',[]);S.budgets=ld('budgets',{});S.bizList=ld('bizList',[]);
       S.bizTx=ld('bizTx',{});S.bizInv=ld('bizInv',{});S.bizProfit=ld('bizProfit',{});
       S.recs=ld('recs',[]);
+      S.events=ld('events',[]);S.tasks=ld('tasks',[]);S.lifeGoals=ld('lifeGoals',[]);
+      S.habits=ld('habits',[]);S.habitLog=ld('habitLog',{});S.journal=ld('journal',[]);
+      S.menus=ld('menus',[]);S.areas=ld('areas',S.areas);
+      S.work=ld('work',S.work);S.school=ld('school',S.school);S.negocioH=ld('negocioH',S.negocioH);
       var sat=d.saved?new Date(d.saved).toLocaleString('es-MX',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
       drvSt('☁️ Sincronizado · '+sat,'#34d399');
       renderDash();renderPers();renderBiz();
