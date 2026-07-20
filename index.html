@@ -284,18 +284,30 @@ input,select,button,textarea{font-family:inherit;font-size:14px}
 .br{background:var(--rd);color:#fff}
 .by{background:var(--yw);color:#000}
 .cc{color:var(--cy)} .cv{color:var(--acc2)}
-.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;margin-top:8px}
-.cal-header{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;margin-bottom:4px}
-.cal-dh{text-align:center;font-size:10px;font-weight:700;color:var(--soft);padding:4px}
-.cal-day{background:var(--c2);border:1px solid var(--c3);border-radius:8px;min-height:52px;min-width:0;max-width:100%;padding:4px;cursor:pointer;transition:.15s;position:relative;overflow:hidden}
-.cal-day:hover{border-color:var(--acc)}
-.cal-day.today{border-color:var(--acc2);background:rgba(124,58,237,.1)}
-.cal-day.other-month{opacity:.35}
-.cal-day.selected{border-color:var(--acc2);background:rgba(124,58,237,.2)}
-.cal-day-num{font-size:12px;font-weight:700;margin-bottom:2px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-top:8px}
+.cal-header{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-bottom:2px}
+.cal-dh{text-align:center;font-size:10px;font-weight:700;color:var(--soft);padding:5px 2px}
+.cal-dh:first-child,.cal-dh:last-child{color:var(--rd);opacity:.7}
+.cal-day{background:var(--c2);border:1.5px solid var(--c3);border-radius:10px;min-height:56px;min-width:0;max-width:100%;padding:5px;cursor:pointer;transition:.15s;position:relative;overflow:hidden}
+.cal-day:hover{border-color:var(--acc);background:var(--c1);transform:translateY(-1px)}
+/* HOY — círculo relleno + fondo verde suave */
+.cal-day.today{border:2px solid var(--acc);background:rgba(6,214,160,.06)}
+/* DÍA SELECCIONADO — borde azul sólido + fondo azul, claramente distinto */
+.cal-day.selected{border:2px solid var(--acc2);background:rgba(17,138,178,.16);box-shadow:0 0 0 2px rgba(17,138,178,.18)}
+/* HOY + SELECCIONADO juntos */
+.cal-day.today.selected{border:2px solid var(--acc);background:rgba(6,214,160,.13);box-shadow:0 0 0 3px rgba(6,214,160,.18)}
+.cal-day.other-month{opacity:.28;pointer-events:none}
+/* Número del día */
+.cal-day-num{font-size:12px;font-weight:700;margin-bottom:3px;line-height:1}
+/* Círculo del día de hoy */
+.cal-today-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;background:var(--acc);color:#050810;border-radius:50%;font-size:11px;font-weight:800;line-height:1;margin-bottom:3px}
 .cal-dot{width:5px;height:5px;border-radius:50%;display:inline-block;margin:1px}
 .cal-dots{display:flex;flex-wrap:wrap;gap:1px;margin-top:2px}
-@media(min-width:768px){.cal-day{min-height:72px}.cal-day-num{font-size:14px}}
+@media(min-width:768px){
+  .cal-day{min-height:80px;padding:7px}
+  .cal-day-num{font-size:13px}
+  .cal-today-badge{width:26px;height:26px;font-size:13px}
+}
 .kanban{display:grid;grid-template-columns:1fr;gap:10px}
 @media(min-width:600px){.kanban{grid-template-columns:repeat(3,1fr)}}
 .kcolumn{background:var(--c2);border:1px solid var(--c3);border-radius:var(--r14);padding:10px}
@@ -809,6 +821,15 @@ Ir al mercado"></textarea></div>
   <div class="pages-wrap">
   <!-- DASHBOARD -->
   <div class="pg on" id="pg-d">
+    <!-- Saludo + fecha + reloj -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
+      <div>
+        <div id="greet" style="font-size:17px;font-weight:800;color:var(--txt)">Bienvenido</div>
+        <div id="heroDate" style="font-size:12px;color:var(--soft);margin-top:2px"></div>
+      </div>
+      <span id="hdrTime" style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--soft);padding-top:4px"></span>
+    </div>
+    <div id="heroSub" style="font-size:11px;color:var(--mut);margin-bottom:10px"></div>
     <div class="hero">
       <div class="hlbl">Patrimonio total estimado</div>
       <div class="hval" id="heroAmt">$0.00</div>
@@ -826,6 +847,7 @@ Ir al mercado"></textarea></div>
     </div>
     <!-- ALERTAS siempre arriba -->
     <div id="dAlerts" style="margin-bottom:4px"></div>
+    <div id="dLifeAlerts" style="margin-bottom:4px"></div>
 
     <!-- GRID PRINCIPAL: 60% izquierda, 40% derecha -->
     <div class="d-desk-grid">
@@ -880,8 +902,11 @@ Ir al mercado"></textarea></div>
 
       </div><!-- /d-col-left -->
 
-      <!-- ═══ COLUMNA DERECHA: Stats + Salud + Fondo emergencia ═══ -->
+      <!-- ═══ COLUMNA DERECHA: Vida diaria + Stats + Salud + Fondo emergencia ═══ -->
       <div class="d-col-right">
+
+        <!-- Stats vida diaria -->
+        <div class="g4" id="dRow" style="margin-bottom:12px"></div>
 
         <!-- Stats del mes -->
         <div class="g4" id="dStats" style="margin-bottom:12px"></div>
@@ -914,7 +939,7 @@ Ir al mercado"></textarea></div>
           <div id="fondoEmergContent"></div>
         </div>
 
-        <!-- Herramientas rápidas -->
+        <!-- Acciones rápidas -->
         <div class="card" style="margin-bottom:10px">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--soft);margin-bottom:10px">⚡ Acciones rápidas</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
@@ -922,9 +947,9 @@ Ir al mercado"></textarea></div>
               <span style="font-size:16px">🔮</span>
               <span style="font-size:10px;color:var(--soft)">Simulador</span>
             </button>
-            <button class="btn bs bsm" style="padding:10px;flex-direction:column;gap:3px" onclick="showPg('pg-a')">
-              <span style="font-size:16px">📊</span>
-              <span style="font-size:10px;color:var(--soft)">Herramientas</span>
+            <button class="btn bs bsm" style="padding:10px;flex-direction:column;gap:3px" onclick="showPg('pg-ag')">
+              <span style="font-size:16px">📅</span>
+              <span style="font-size:10px;color:var(--soft)">Agenda</span>
             </button>
             <button class="btn bs bsm" style="padding:10px;flex-direction:column;gap:3px" onclick="showAdvisor()">
               <span style="font-size:16px">🤖</span>
@@ -936,6 +961,26 @@ Ir al mercado"></textarea></div>
             </button>
           </div>
         </div>
+
+        <!-- Eventos de hoy -->
+        <div class="sh"><div class="st">📅 Hoy</div><button class="btn bs bsm" onclick="openEvent(null,todayStr())">+ Evento</button></div>
+        <div id="dToday" style="margin-bottom:4px"></div>
+
+        <!-- Mañana -->
+        <div class="sh"><div class="st">📆 Mañana</div></div>
+        <div id="dTomorrow" style="margin-bottom:4px"></div>
+
+        <!-- Tareas prioritarias -->
+        <div class="sh"><div class="st">✅ Tareas prioritarias</div><button class="btn bs bsm" onclick="showPg('pg-t')">Ver todas</button></div>
+        <div id="dTasks" style="margin-bottom:4px"></div>
+
+        <!-- Hábitos de hoy -->
+        <div class="sh"><div class="st">💪 Hábitos de hoy</div><button class="btn bs bsm" onclick="showPg('pg-h')">Ver todos</button></div>
+        <div id="dHabits" style="margin-bottom:4px"></div>
+
+        <!-- Objetivos de vida activos -->
+        <div class="sh"><div class="st">🎯 Objetivos activos</div><button class="btn bs bsm" onclick="showPg('pg-g')">Ver todos</button></div>
+        <div id="dGoals" style="margin-bottom:8px"></div>
 
       </div><!-- /d-col-right -->
     </div><!-- /d-desk-grid -->
@@ -1995,7 +2040,7 @@ function showPg(id){
       var dot = cel('div'); dot.className='bndot'; bn.appendChild(dot);
     }
   }
-  if(id==='pg-d') renderDash();
+  if(id==='pg-d'){renderDash();renderDashLife();}
   if(id==='pg-p') renderPers();
   if(id==='pg-b') renderBiz();
 
@@ -2026,9 +2071,12 @@ function initApp(){
   var fontSizes={small:'13px',normal:'15px',large:'17px'};
   document.body.style.fontSize=fontSizes[S.fontSize]||'15px';
   updateFontBtns();
+  refreshCatMaps();
   renderDash();
+  renderDashLife();
   renderPers();
   setTimeout(drvInit,2000);
+  setInterval(tick,1000);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -4705,7 +4753,7 @@ function renderDashLife(){
   if(nearGoals.length)al+='<div class="al alw">🎯 '+nearGoals.length+' objetivo(s) con fecha límite en los próximos 7 días</div>';
   var streak=getStreakAll();
   if(streak>=7)al+='<div class="al alg">🔥 ¡Llevas '+streak+' días seguidos completando todos tus hábitos!</div>';
-  var da=ge('dAlerts');if(da)da.innerHTML=al;
+  var da=ge('dLifeAlerts');if(da)da.innerHTML=al;
   renderWorkWidget();
   // Today's events
   var todayEvs=getEventsForDate(todayStr());
@@ -4826,7 +4874,8 @@ function renderMonthGrid(){
   for(var d2=1;d2<=daysIn;d2++){
     var ds=(S.calY+'-'+(S.calM+1<10?'0':'')+(S.calM+1)+'-'+(d2<10?'0':'')+d2);
     var evs=getEventsForDate(ds);
-    var cls='cal-day'+(ds===today2?' today':'')+(ds===S.selDate?' selected':'');
+    var isToday=(ds===today2), isSel=(ds===S.selDate);
+    var cls='cal-day'+(isToday?' today':'')+(isSel?' selected':'');
     var winfo=getDayInfo(ds);
     var col=winfo.color;
     var firstTarea=winfo.tareas[0];
@@ -4835,17 +4884,20 @@ function renderMonthGrid(){
       extraTareas.map(t=>'<span style="width:6px;height:6px;min-width:6px;border-radius:50%;background:'+t.color+';display:inline-block" title="'+t.texto+'"></span>').join('')+
       (winfo.tareas.length>5?'<span style="font-size:8px;color:var(--mut);margin-left:1px">+'+(winfo.tareas.length-5)+'</span>':'')+
       '</div>':'';
-    var evPills=evs.slice(0,2).map(e=>'<div class="ev-pill" style="background:'+(CAT_COL[e.category]||'var(--acc3)')+'80;color:var(--txt)">'+e.title+'</div>').join('');
+    var evPills=evs.slice(0,2).map(e=>'<div class="ev-pill" style="background:'+(CAT_COL[e.category]||'var(--acc2)')+'55;color:var(--txt);border-left:2px solid '+(CAT_COL[e.category]||'var(--acc2)')+'">'+e.title+'</div>').join('');
     var evMore=evs.length>2?'<div class="ev-pill" style="background:var(--c3);color:var(--mut)">+'+(evs.length-2)+' más</div>':'';
     var needsApoyo=winfo.esDiaEscolar&&(!winfo.puedeLlevar||!winfo.puedeRecoger);
     var apT=(S.work.apoyoTexto||'Apoyo'), apC=(S.work.apoyoColor||'#f43f5e');
     var apoyoTag=needsApoyo?'<span style="font-size:8px;font-weight:700;letter-spacing:.2px;color:'+apC+';background:'+apC+'26;border-radius:5px;padding:2px 5px;white-space:nowrap;max-width:64px;overflow:hidden;text-overflow:ellipsis">'+apT+'</span>':'';
     var cocinaTag=firstTarea?'<span style="font-size:8px;font-weight:700;letter-spacing:.2px;color:'+firstTarea.color+';background:'+firstTarea.color+'26;border-radius:5px;padding:2px 5px;white-space:nowrap;max-width:64px;overflow:hidden;text-overflow:ellipsis" title="'+firstTarea.texto+'">'+firstTarea.texto+'</span>':'';
     var rightCol=(apoyoTag||cocinaTag||extraDots)?'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;margin-left:4px">'+apoyoTag+cocinaTag+extraDots+'</div>':'';
-    var style=col?' style="border-left:3px solid '+col+'"':'';
-    html2+='<div class="'+cls+'"'+style+' onclick="selDay(\''+ds+'\')">'+
-      '<div class="cal-day-num">'+d2+'</div>'+
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px;margin-top:2px">'+
+    // Borde de turno laboral solo si hay color de turno (no sobreescribe el borde de today/selected)
+    var styleStr=col?' style="border-left:3px solid '+col+(isToday||isSel?';border-top-color:inherit;border-right-color:inherit;border-bottom-color:inherit':'')+'"':'';
+    // Número del día: círculo relleno para hoy, normal para el resto
+    var numHtml=isToday?'<div class="cal-today-badge">'+d2+'</div>':'<div class="cal-day-num">'+d2+'</div>';
+    html2+='<div class="'+cls+'"'+styleStr+' onclick="selDay(\''+ds+'\')">'+
+      numHtml+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px;margin-top:1px">'+
         '<div class="cal-dots" style="flex:1;min-width:0">'+evPills+evMore+'</div>'+
         rightCol+
       '</div>'+
