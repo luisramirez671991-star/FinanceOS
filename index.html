@@ -268,13 +268,22 @@ input,select,button,textarea{font-family:inherit;font-size:14px}
   .hero .hrow { flex-wrap:wrap; }
   .hi { min-width:calc(50% - 4px); flex:1; }
   /* Topbar visible on mobile */
-  .topbar { display:flex !important; position:sticky; top:0; z-index:100; }
-  .topbar .topbar-logo { display:block !important; }
+  .topbar { display:flex !important; position:sticky; top:0; z-index:100; padding:9px 10px; gap:6px; }
+  .topbar .topbar-logo { display:block !important; font-size:13px; flex-shrink:0; }
+  /* Botones de la barra superior: nunca se cortan — se encogen y, si aun así no caben, se deslizan */
+  .tb-btns{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex-shrink:1;min-width:0}
+  .tb-btns::-webkit-scrollbar{display:none}
+  .tbb{flex-shrink:0;padding:7px 9px;font-size:11px}
   /* Modals from bottom on mobile */
   .ov { align-items:flex-end; padding:0; }
   .mbox { border-radius:18px 18px 0 0 !important; max-height:92vh; }
   /* 2-col stats on mobile */
   .g4 { grid-template-columns:repeat(2,1fr) !important; }
+}
+@media(max-width:400px){
+  .topbar .topbar-logo{display:none !important}
+  .tbb-txt{display:none}
+  .tbb{padding:8px 10px}
 }
 
 
@@ -811,9 +820,9 @@ Ir al mercado"></textarea></div>
   <div class="topbar">
     <div class="topbar-logo">💎 FinanceOS</div>
     <div class="tb-btns">
-      <button class="tbb" onclick="showAdvisor()">🤖 Asesor</button>
-      <button class="tbb hi" onclick="showM('mExport')">💾 Drive</button>
-      <button class="tbb" onclick="showPg('pg-s')">⚙️ Ajustes</button>
+      <button class="tbb" onclick="showAdvisor()">🤖<span class="tbb-txt"> Asesor</span></button>
+      <button class="tbb hi" onclick="showM('mExport')">💾<span class="tbb-txt"> Drive</span></button>
+      <button class="tbb" onclick="showPg('pg-s')">⚙️<span class="tbb-txt"> Ajustes</span></button>
       <button class="tbb" onclick="doLogout()">🚪</button>
     </div>
   </div>
@@ -2336,7 +2345,7 @@ function saveBank(){
   else S.banks.push(bank);
   persist(); hideM('mBank'); toast('Cuenta guardada ✓'); renderDash(); upBankSel();
 }
-function delBank(id){if(!confirm('¿Eliminar esta cuenta?'))return;S.banks=S.banks.filter(function(b){return b.id!==id;});persist();renderDash();}
+function delBank(id){if(!confirm('¿Eliminar esta cuenta?'))return;S.banks=S.banks.filter(function(b){return b.id!==id;});persist();renderPers();renderDash();}
 
 function upBankSel(){
   var s = ge('pBankSel'); if(!s)return;
@@ -2388,7 +2397,7 @@ function confirmAportar(){
   S.goals=S.goals.map(function(g){
     return g.id===id?Object.assign({},g,{saved:(g.saved||0)+amt}):g;
   });
-  persist(); hideM('mAportar'); renderDash(); toast('+'+fmt(amt)+' aportado ✓');
+  persist(); hideM('mAportar'); renderPers(); renderDash(); toast('+'+fmt(amt)+' aportado ✓');
 }
 function delGoal(id){if(!confirm('¿Eliminar meta?'))return;S.goals=S.goals.filter(function(g){return g.id!==id;});persist();renderDash();}
 
@@ -2442,7 +2451,7 @@ function confirmarLiquidar(){
       description:'Liquidación: '+(inv.desc||inv.type),bankId:bankId});
   }
   S.invs=S.invs.filter(function(i){return i.id!==id;});
-  persist(); hideM('mLiquidar'); renderDash();
+  persist(); hideM('mLiquidar'); renderPers(); renderDash();
   var diff=monto-inv.amount;
   toast('✓ Liquidado: '+fmt(monto)+(diff!==0?' ('+(diff>0?'+':'')+fmt(diff)+' vs capital original)':''));
 }
@@ -2507,7 +2516,7 @@ function applyLP(){
     });
   }
   S.loans=S.loans.map(function(l){return l.id===id?Object.assign({},l,{paid:Math.min((l.paid||0)+amt,l.total||0)}):l;});
-  persist(); hideM('mLPay'); renderDash();
+  persist(); hideM('mLPay'); renderPers(); renderDash();
   toast((ln.dir==='credit'?'✓ Cobro registrado: +':'✓ Pago registrado: -')+fmt(amt));
 }
 function delLoan(id){if(!confirm('¿Eliminar?'))return;S.loans=S.loans.filter(function(l){return l.id!==id;});persist();renderDash();}
@@ -3264,37 +3273,61 @@ function renderPatChart(pat){
   });
   var color=vals[vals.length-1]>=vals[0]?'#06d6a0':'#f43f5e';
 
-  // ── Proyección: tendencia promedio de los últimos 14 días (o menos si no hay tantos) ──
+  // ── Proyección: tendencia promedio + banda de variabilidad de los últimos 14 días ──
   var sample=hist.slice(-14);
   var n=sample.length;
-  var avgDelta=0;
+  var avgDelta=0, stdDelta=0;
   if(n>=2){
     var deltas=[];
     for(var i=1;i<n;i++){deltas.push(sample[i].v-sample[i-1].v);}
     avgDelta=deltas.reduce(function(s,d){return s+d;},0)/deltas.length;
+    if(deltas.length>=2){
+      var variance=deltas.reduce(function(s,d){return s+Math.pow(d-avgDelta,2);},0)/deltas.length;
+      stdDelta=Math.sqrt(variance);
+    }
   }
+  // Si hay muy poco historial, usa un rango mínimo (±15% del último valor) para que la banda no sea invisible
+  if(stdDelta<Math.abs(avgDelta)*0.15) stdDelta=Math.max(Math.abs(avgDelta)*0.4,Math.abs(vals[vals.length-1])*0.02);
+
   var PROJ_DAYS=30;
   var lastDate=new Date(hist[hist.length-1].date+'T12:00:00');
   var lastVal=vals[vals.length-1];
-  var projLabels=[],projVals=[];
+  var projLabels=[];
   // Línea real: rellena con null en la zona futura para que no dibuje ahí
   var realVals=vals.concat(new Array(PROJ_DAYS).fill(null));
-  var dottedVals=new Array(vals.length-1).fill(null).concat([lastVal]); // empieza exactamente donde termina la real
+  var dottedVals=new Array(vals.length-1).fill(null).concat([lastVal]);
+  var bandUpper=new Array(vals.length-1).fill(null).concat([lastVal]);
+  var bandLower=new Array(vals.length-1).fill(null).concat([lastVal]);
   for(var p=1;p<=PROJ_DAYS;p++){
     var d=new Date(lastDate); d.setDate(d.getDate()+p);
     projLabels.push(d.getDate()+'/'+(d.getMonth()+1));
     dottedVals.push(lastVal+avgDelta*p);
+    // La banda se ensancha con la raíz del tiempo (más incertidumbre entre más lejos se proyecta)
+    var spread=stdDelta*Math.sqrt(p)*1.4;
+    bandUpper.push(lastVal+avgDelta*p+spread);
+    bandLower.push(lastVal+avgDelta*p-spread);
   }
   var allLabels=labels.concat(projLabels);
   var projColor=avgDelta>=0?'#06d6a0':'#f43f5e';
 
+  // ── Formato del eje: pesos completos si el saldo es chico, miles si es grande ──
+  var allVisibleVals=vals.concat(bandUpper.filter(function(v){return v!==null;})).concat(bandLower.filter(function(v){return v!==null;}));
+  var maxAbs=Math.max.apply(null,allVisibleVals.map(Math.abs));
+  var axisFmt=function(v){
+    if(maxAbs<10000) return '$'+Math.round(v).toLocaleString('es-MX');
+    if(maxAbs<1000000) return '$'+Math.round(v/1000)+'k';
+    return '$'+(v/1000000).toFixed(1)+'M';
+  };
+
   _charts['patChart']=new Chart(c.getContext('2d'),{
     type:'line',
     data:{labels:allLabels,datasets:[
-      {label:'Real',data:realVals,borderColor:color,backgroundColor:color.replace(')',',0.08)').replace('rgb','rgba'),fill:true,tension:0,pointRadius:0,borderWidth:2.5},
-      {label:'Proyección 30 días',data:dottedVals,borderColor:projColor,backgroundColor:'transparent',borderDash:[5,4],fill:false,tension:0,pointRadius:0,borderWidth:2}
+      {label:'Real',data:realVals,borderColor:color,backgroundColor:color.replace(')',',0.08)').replace('rgb','rgba'),fill:true,tension:0,pointRadius:0,borderWidth:2.5,order:1},
+      {label:'Rango estimado',data:bandUpper,borderColor:'transparent',backgroundColor:projColor+'20',fill:'+1',tension:0,pointRadius:0,borderWidth:0,order:3},
+      {label:'',data:bandLower,borderColor:'transparent',backgroundColor:'transparent',fill:false,tension:0,pointRadius:0,borderWidth:0,order:3},
+      {label:'Proyección promedio',data:dottedVals,borderColor:projColor,backgroundColor:'transparent',borderDash:[5,4],fill:false,tension:0,pointRadius:0,borderWidth:2,order:2}
     ]},
-    options:{responsive:true,plugins:{legend:{display:true,position:'top',align:'end',labels:{color:'#8fa3b1',font:{size:9},boxWidth:14,usePointStyle:false}},tooltip:{backgroundColor:'rgba(14,20,33,.95)',titleColor:'#f1f5f9',bodyColor:'#8fa3b1',callbacks:{label:function(ctx){return ctx.dataset.label+': '+fmt(ctx.raw);}}}},scales:{x:{ticks:{color:'#8fa3b1',font:{size:8},maxTicksLimit:7},grid:{display:false}},y:{ticks:{color:'#8fa3b1',font:{size:8},callback:function(v){return '$'+Math.round(v/1000)+'k';}},grid:{color:'rgba(255,255,255,.04)'}}}}
+    options:{responsive:true,plugins:{legend:{display:true,position:'top',align:'end',labels:{color:'#8fa3b1',font:{size:9},boxWidth:14,usePointStyle:false,filter:function(item){return item.text!=='';}}},tooltip:{backgroundColor:'rgba(14,20,33,.95)',titleColor:'#f1f5f9',bodyColor:'#8fa3b1',filter:function(item){return item.dataset.label!=='';},callbacks:{label:function(ctx){return ctx.dataset.label+': '+fmt(ctx.raw);}}}},scales:{x:{ticks:{color:'#8fa3b1',font:{size:8},maxTicksLimit:7},grid:{display:false}},y:{ticks:{color:'#8fa3b1',font:{size:8},callback:axisFmt},grid:{color:'rgba(255,255,255,.04)'}}}}
   });
 }
 
@@ -3324,7 +3357,7 @@ function confirmarTransfer(){
   var toName=(S.banks.find(function(b){return b.id===toId;})||{}).name||'';
   var fromName=(from||{}).name||'';
   S.transfers.push({id:uid(),date:getV('trDate'),from:fromId,to:toId,amount:amt,desc:getV('trDesc')||'Transferencia'});
-  persist(); hideM('mTransfer'); renderDash(); toast('✓ '+fmt(amt)+' transferido de '+fromName+' a '+toName);
+  persist(); hideM('mTransfer'); renderPers(); renderDash(); toast('✓ '+fmt(amt)+' transferido de '+fromName+' a '+toName);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -3355,10 +3388,16 @@ function renderProyeccion(){
     '<div class="sc"><div class="sl">Movimientos fijos</div><div class="sv ct">'+S.recs.length+'</div></div>'+
     '</div>';
   var c=ge('projChart'); if(!c||typeof Chart==='undefined')return;
+  var maxAbsProj=Math.max.apply(null,vals.map(Math.abs));
+  var axisFmtProj=function(v){
+    if(maxAbsProj<10000) return '$'+Math.round(v).toLocaleString('es-MX');
+    if(maxAbsProj<1000000) return '$'+Math.round(v/1000)+'k';
+    return '$'+(v/1000000).toFixed(1)+'M';
+  };
   _charts['projChart']=new Chart(c.getContext('2d'),{
     type:'line',
     data:{labels:labels,datasets:[{data:vals,borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,0.1)',fill:true,tension:0.3,pointRadius:0,borderWidth:2}]},
-    options:{responsive:true,plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(14,20,33,.95)',titleColor:'#f1f5f9',bodyColor:'#8fa3b1',callbacks:{label:function(ctx){return fmt(ctx.raw);}}}},scales:{x:{ticks:{color:'#8fa3b1',font:{size:8},maxTicksLimit:8},grid:{display:false}},y:{ticks:{color:'#8fa3b1',font:{size:8},callback:function(v){return '$'+Math.round(v/1000)+'k';}},grid:{color:'rgba(255,255,255,.04)'}}}}
+    options:{responsive:true,plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(14,20,33,.95)',titleColor:'#f1f5f9',bodyColor:'#8fa3b1',callbacks:{label:function(ctx){return fmt(ctx.raw);}}}},scales:{x:{ticks:{color:'#8fa3b1',font:{size:8},maxTicksLimit:8},grid:{display:false}},y:{ticks:{color:'#8fa3b1',font:{size:8},callback:axisFmtProj},grid:{color:'rgba(255,255,255,.04)'}}}}
   });
 }
 
@@ -3672,10 +3711,16 @@ function renderProyeccionLargoPlazo(){
       '<div style="font-size:11px;color:var(--soft);margin-top:8px">Calculado con base en tu promedio de los últimos '+prom.meses+' mes(es) registrados, asumiendo que mantienes el mismo ritmo de ahorro, sin contar rendimientos de inversión.</div>';
   }
   var c=ge('chartProyeccion'); if(!c||typeof Chart==='undefined')return;
+  var maxAbsLP=Math.max.apply(null,vals.map(Math.abs));
+  var axisFmtLP=function(v){
+    if(maxAbsLP<10000) return '$'+Math.round(v).toLocaleString('es-MX');
+    if(maxAbsLP<1000000) return '$'+Math.round(v/1000)+'k';
+    return '$'+(v/1000000).toFixed(1)+'M';
+  };
   _charts['chartProyeccion']=new Chart(c.getContext('2d'),{
     type:'line',
     data:{labels:labels,datasets:[{data:vals,borderColor:'#a855f7',backgroundColor:'rgba(168,85,247,0.12)',fill:true,tension:0.3,pointRadius:4,pointBackgroundColor:'#a855f7',borderWidth:2}]},
-    options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return fmt(ctx.raw);}}}},scales:{x:{ticks:{color:'#8fa3b1',font:{size:9}},grid:{display:false}},y:{ticks:{color:'#8fa3b1',font:{size:8},callback:function(v){return '$'+Math.round(v/1000)+'k';}},grid:{color:'rgba(255,255,255,.04)'}}}}
+    options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return fmt(ctx.raw);}}}},scales:{x:{ticks:{color:'#8fa3b1',font:{size:9}},grid:{display:false}},y:{ticks:{color:'#8fa3b1',font:{size:8},callback:axisFmtLP},grid:{color:'rgba(255,255,255,.04)'}}}}
   });
 }
 
