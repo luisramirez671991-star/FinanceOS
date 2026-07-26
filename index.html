@@ -505,6 +505,11 @@ input,select,button,textarea{font-family:inherit;font-size:14px}
 <button class="btn bp bfu" onclick="saveRec()">Guardar</button>
 </div></div>
 
+<div class="ov" id="mCierreDia" style="display:none" onclick="if(event.target===this)hideM('mCierreDia')">
+<div class="mbox"><div class="mt">🌙 Cierre del día <button class="mc" onclick="hideM('mCierreDia')">✕</button></div>
+<div id="cierreDiaBody"></div>
+</div></div>
+
 <div class="ov" id="mExport" style="display:none" onclick="if(event.target===this)hideM('mExport')">
 <div class="mbox"><div class="mt">💾 Datos y Respaldo <button class="mc" onclick="hideM('mExport')">✕</button></div>
 <div style="background:linear-gradient(135deg,rgba(6,214,160,.07),rgba(17,138,178,.05));border:1px solid rgba(6,214,160,.14);border-radius:12px;padding:14px;margin-bottom:12px">
@@ -513,7 +518,13 @@ input,select,button,textarea{font-family:inherit;font-size:14px}
   <button class="btn bs bfu" id="drvConnBtn" style="margin-bottom:7px">🔗 Conectar Google Drive</button>
   <button class="btn bg bfu" id="drvSaveBtn" style="display:none;margin-bottom:7px" onclick="drvSave()">☁️ Guardar en Drive ahora</button>
   <button class="btn bi bfu" id="drvLoadBtn" style="display:none" onclick="drvLoad()">📥 Cargar desde Drive</button>
-  <div style="font-size:10px;color:var(--mut);margin-top:8px;line-height:1.6">Los datos se guardan automáticamente en Drive 3 segundos después de cada cambio. Para abrir en otro dispositivo: conecta Drive y toca "Cargar desde Drive".</div>
+  <div style="font-size:10px;color:var(--mut);margin-top:8px;line-height:1.6">Los datos se guardan automáticamente en Drive 3 segundos después de cada cambio. Para abrir en otro dispositivo: conecta Drive y toca "Cargar desde Drive". También revisa solo cada ~25s si hay cambios nuevos de otro dispositivo y los trae automático (espera a que termines de escribir para no interrumpirte).</div>
+</div>
+<div style="background:rgba(124,58,237,.06);border:1px solid rgba(124,58,237,.15);border-radius:12px;padding:14px;margin-bottom:12px">
+  <div style="font-size:13px;font-weight:700;color:var(--acc2);margin-bottom:6px">🗄️ Copias de respaldo con historial</div>
+  <div style="font-size:11px;color:var(--soft);margin-bottom:10px;line-height:1.6">Cada semana se guarda una copia fechada aparte (se conservan las últimas 8, ~2 meses). Si algo se guarda mal, puedes regresar a una versión anterior.</div>
+  <button class="btn bs bfu" onclick="drvListBackups()">📜 Ver copias disponibles</button>
+  <div id="backupList" style="margin-top:8px"></div>
 </div>
 <div class="sep"></div>
 <div style="display:flex;flex-direction:column;gap:7px">
@@ -990,6 +1001,8 @@ Ir al mercado"></textarea></div>
         <!-- Objetivos de vida activos -->
         <div class="sh"><div class="st">🎯 Objetivos activos</div><button class="btn bs bsm" onclick="showPg('pg-g')">Ver todos</button></div>
         <div id="dGoals" style="margin-bottom:8px"></div>
+
+        <button class="btn bp bfu" style="margin-top:6px" onclick="openCierreDia()">🌙 Cierre del día</button>
 
       </div><!-- /d-col-right -->
     </div><!-- /d-desk-grid -->
@@ -3919,7 +3932,8 @@ var GD={
   CID:'129798170458-ppgbdffb1mom8dvt116k3nuig0loffhj.apps.googleusercontent.com',
   SC:'https://www.googleapis.com/auth/drive.appdata',
   FN:'financeos_v5.json',
-  tok:null, fId:null, timer:null, ready:false, tc:null
+  tok:null, fId:null, timer:null, ready:false, tc:null,
+  lastMod:null, pollTimer:null, syncing:false
 };
 function drvInit(){
   if(typeof google==='undefined'){setTimeout(drvInit,1000);return;}
@@ -3960,11 +3974,13 @@ function drvUI(conn){
     if(sb) sb.style.display='block';
     if(lb) lb.style.display='block';
     var db=ge('drvbar'); if(db) db.style.display='block';
+    drvStartPolling();
   } else {
     cb.textContent='🔗 Conectar Google Drive'; cb.className='btn bs bfu';
     if(sb) sb.style.display='none';
     if(lb) lb.style.display='none';
     var db2=ge('drvbar'); if(db2) db2.style.display='none';
+    drvStopPolling();
   }
 }
 function drvSt(msg,col){
@@ -3986,8 +4002,49 @@ function drvFindFile(){
     return null;
   });
 }
+// Revisa Drive cada cierto tiempo (y al volver a la pestaña/app) y trae solo si hay algo más nuevo que lo que ya tenemos
+// ¿Hay un formulario/modal abierto o el usuario está escribiendo justo ahora?
+function isUserBusy(){
+  var modals=document.querySelectorAll('.ov');
+  for(var i=0;i<modals.length;i++){
+    if(modals[i].style.display==='flex') return true;
+  }
+  var ae=document.activeElement;
+  if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'||ae.tagName==='SELECT')) return true;
+  return false;
+}
+function drvCheckForUpdates(retryCount){
+  if(!GD.tok||GD.syncing)return;
+  if(isUserBusy()){
+    retryCount=(retryCount||0)+1;
+    if(retryCount<=8) setTimeout(function(){drvCheckForUpdates(retryCount);},5000); // reintenta cada 5s hasta ~40s mientras siga ocupado
+    return;
+  }
+  drvFindFile().then(function(file){
+    if(!file)return;
+    if(!GD.lastMod || new Date(file.modifiedTime) > new Date(GD.lastMod)){
+      if(isUserBusy()){ setTimeout(function(){drvCheckForUpdates(0);},5000); return; } // por si empezó a escribir justo en este momento
+      drvLoad(true);
+    }
+  }).catch(function(){/* revisión silenciosa: si falla, se reintenta en el próximo ciclo */});
+}
+function drvStartPolling(){
+  if(GD.pollTimer)return;
+  GD.pollTimer=setInterval(drvCheckForUpdates,25000);
+  if(!GD._visListenerAdded){
+    GD._visListenerAdded=true;
+    document.addEventListener('visibilitychange',function(){
+      if(!document.hidden) drvCheckForUpdates();
+    });
+    window.addEventListener('focus',function(){ drvCheckForUpdates(); });
+  }
+}
+function drvStopPolling(){
+  clearInterval(GD.pollTimer); GD.pollTimer=null;
+}
 function drvSave(){
   if(!GD.tok)return;
+  GD.syncing=true;
   drvSt('⏳ Guardando en Drive...','#fbbf24');
   var data={v:6,saved:new Date().toISOString(),pass:S.pass,recoveryPin:S.recoveryPin,contact:S.contact,banks:S.banks,goals:S.goals,invs:S.invs,loans:S.loans,pTx:S.pTx,budgets:S.budgets,bizList:S.bizList,bizTx:S.bizTx,bizInv:S.bizInv,bizProfit:S.bizProfit,recs:S.recs,patHistory:S.patHistory,notes:S.notes,transfers:S.transfers,events:S.events,tasks:S.tasks,lifeGoals:S.lifeGoals,habits:S.habits,habitLog:S.habitLog,journal:S.journal,menus:S.menus,areas:S.areas,work:S.work,school:S.school,negocioH:S.negocioH};
   var body=JSON.stringify(data);
@@ -4007,46 +4064,176 @@ function drvSave(){
       return r;
     }).then(function(r){
       var t=new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+      GD.lastMod=new Date().toISOString();
+      GD.syncing=false;
       drvSt('☁️ Guardado · '+t,'#34d399');
+      drvWeeklyBackupCheck();
     }).catch(function(e){
+    GD.syncing=false;
     if(e&&e.code===401){drvTokenExpired(false);}
     else{drvSt('❌ Error al guardar: '+(e.message||'reconecta Drive'),'#f43f5e');}
   });
   }).catch(function(e){
+    GD.syncing=false;
     if(e&&e.code===401){drvTokenExpired(false);}
     else{drvSt('❌ Error de conexión: '+(e.message||''),'#f43f5e');}
   });
 }
+
+// ─── CIERRE DEL DÍA ───────────────────────────────────────────────
+function openCierreDia(){
+  var hoy=todayStr();
+  var manana=(typeof addDays==='function')?addDays(hoy,1):hoy;
+
+  var ventasHoy=S.pTx.filter(function(t){return t.date===hoy&&t.type==='income';}).reduce(function(s,t){return s+t.amount;},0);
+  var gastosHoy=S.pTx.filter(function(t){return t.date===hoy&&t.type==='expense';}).reduce(function(s,t){return s+t.amount;},0);
+  S.bizList.forEach(function(b){
+    (S.bizTx[b.id]||[]).forEach(function(t){
+      if(t.date!==hoy)return;
+      if(t.type==='income')ventasHoy+=(t.amount||0); else gastosHoy+=(t.amount||0);
+    });
+  });
+  var gastoComida=S.menus.filter(function(m){return m.fecha===hoy;}).reduce(function(s,m){return s+(Number(m.costo)||0);},0);
+
+  var pendientes=S.tasks.filter(function(t){return t.status!=='done';});
+  var tareasHoy=pendientes.filter(function(t){return t.dueDate===hoy;});
+  var tareasVencidas=pendientes.filter(function(t){return t.dueDate&&t.dueDate<hoy;});
+
+  var turnoManana=(typeof getShiftForDate==='function')?getShiftForDate(manana):null;
+  var turnoLbl=turnoManana?(turnoManana.label+(turnoManana.start?' ('+turnoManana.start+'–'+turnoManana.end+')':'')):'Sin turno configurado';
+  var turnoColor=turnoManana&&turnoManana.color?turnoManana.color:'var(--soft)';
+
+  var html='<div class="g4" style="margin-bottom:12px">'+
+    '<div class="sc"><div class="sl">Ventas hoy</div><div class="sv" style="color:var(--gr)">'+fmt(ventasHoy)+'</div></div>'+
+    '<div class="sc"><div class="sl">Gastos hoy</div><div class="sv" style="color:var(--rd)">'+fmt(gastosHoy)+'</div></div>'+
+    '<div class="sc"><div class="sl">Comida hoy</div><div class="sv" style="color:var(--go)">'+fmt(gastoComida)+'</div></div>'+
+    '<div class="sc"><div class="sl">Neto del día</div><div class="sv" style="color:'+((ventasHoy-gastosHoy)>=0?'var(--gr)':'var(--rd)')+'">'+fmt(ventasHoy-gastosHoy)+'</div></div>'+
+  '</div>';
+
+  html+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--soft);margin:10px 0 6px">✅ Tareas</div>';
+  if(!tareasHoy.length&&!tareasVencidas.length){
+    html+='<div style="font-size:12px;color:var(--gr)">Sin pendientes — buen cierre 🎉</div>';
+  }else{
+    tareasVencidas.slice(0,5).forEach(function(t){html+='<div style="font-size:12px;color:var(--rd);padding:4px 0">⚠️ '+t.title+' (vencida)</div>';});
+    tareasHoy.slice(0,5).forEach(function(t){html+='<div style="font-size:12px;color:var(--soft);padding:4px 0">• '+t.title+'</div>';});
+    var restantes=(tareasHoy.length+tareasVencidas.length)-Math.min(5,tareasVencidas.length)-Math.min(5,tareasHoy.length);
+    if(restantes>0)html+='<div style="font-size:11px;color:var(--mut)">+'+restantes+' más</div>';
+  }
+
+  html+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--soft);margin:14px 0 6px">🕐 Mañana</div>';
+  html+='<div style="font-size:13px;font-weight:600;color:'+turnoColor+'">'+turnoLbl+'</div>';
+
+  ge('cierreDiaBody').innerHTML=html;
+  showM('mCierreDia');
+}
+
+
+// Cada ~7 días se guarda una copia fechada aparte (no la que se sobreescribe siempre),
+// para poder regresar a una versión anterior si algo se guarda mal. Se conservan las últimas 8 (~2 meses).
+function drvWeeklyBackupCheck(){
+  if(!GD.tok)return;
+  var last=localStorage.getItem(NS+'lastBackup');
+  var now=Date.now();
+  if(last && (now-parseInt(last,10))<7*24*60*60*1000) return;
+  drvCreateBackup();
+}
+function drvCreateBackup(){
+  if(!GD.tok)return;
+  var data={v:6,saved:new Date().toISOString(),pass:S.pass,recoveryPin:S.recoveryPin,contact:S.contact,banks:S.banks,goals:S.goals,invs:S.invs,loans:S.loans,pTx:S.pTx,budgets:S.budgets,bizList:S.bizList,bizTx:S.bizTx,bizInv:S.bizInv,bizProfit:S.bizProfit,recs:S.recs,patHistory:S.patHistory,notes:S.notes,transfers:S.transfers,events:S.events,tasks:S.tasks,lifeGoals:S.lifeGoals,habits:S.habits,habitLog:S.habitLog,journal:S.journal,menus:S.menus,areas:S.areas,work:S.work,school:S.school,negocioH:S.negocioH};
+  var body=JSON.stringify(data);
+  var fname='financeos_backup_'+todayStr()+'.json';
+  var meta={name:fname,parents:['appDataFolder']};
+  var form=new FormData();
+  form.append('metadata',new Blob([JSON.stringify(meta)],{type:'application/json'}));
+  form.append('file',new Blob([body],{type:'application/json'}));
+  fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'POST',headers:{'Authorization':'Bearer '+GD.tok},body:form})
+  .then(function(r){return r.json();})
+  .then(function(){
+    localStorage.setItem(NS+'lastBackup',String(Date.now()));
+    drvPruneOldBackups();
+  }).catch(function(){/* si falla, se reintenta en el próximo guardado */});
+}
+function drvPruneOldBackups(){
+  var q="name contains 'financeos_backup_' and trashed=false";
+  fetch('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=files(id,name,modifiedTime)&orderBy=modifiedTime%20desc&q='+encodeURIComponent(q),{headers:{'Authorization':'Bearer '+GD.tok}})
+  .then(function(r){return r.json();})
+  .then(function(d){
+    var files=(d.files||[]).slice(8); // conserva las 8 más recientes, borra el resto
+    files.forEach(function(f){
+      fetch('https://www.googleapis.com/drive/v3/files/'+f.id,{method:'DELETE',headers:{'Authorization':'Bearer '+GD.tok}}).catch(function(){});
+    });
+  }).catch(function(){});
+}
+function drvListBackups(){
+  var el=ge('backupList'); if(!el)return;
+  if(!GD.tok){el.innerHTML='<div style="font-size:12px;color:var(--mut)">Conecta Drive primero.</div>';return;}
+  el.innerHTML='<div style="font-size:12px;color:var(--soft)">Buscando copias...</div>';
+  var q="name contains 'financeos_backup_' and trashed=false";
+  fetch('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=files(id,name,modifiedTime)&orderBy=modifiedTime%20desc&q='+encodeURIComponent(q),{headers:{'Authorization':'Bearer '+GD.tok}})
+  .then(function(r){return r.json();})
+  .then(function(d){
+    var files=d.files||[];
+    if(!files.length){el.innerHTML='<div style="font-size:12px;color:var(--mut)">Aún no hay copias de respaldo. Se crean solas cada semana mientras uses la app.</div>';return;}
+    el.innerHTML=files.map(function(f){
+      var dl=new Date(f.modifiedTime).toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'});
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 10px;background:var(--c2);border-radius:8px;margin-bottom:6px">'+
+        '<span style="font-size:12px">🗓️ '+dl+'</span>'+
+        '<button class="btn bs bsm" onclick="drvRestoreBackup(\''+f.id+'\',\''+dl+'\')">Restaurar</button>'+
+        '</div>';
+    }).join('');
+  }).catch(function(){el.innerHTML='<div style="font-size:12px;color:var(--rd)">Error al buscar copias. Intenta de nuevo.</div>';});
+}
+function drvRestoreBackup(fileId,dateLabel){
+  if(!confirm('⚠️ Esto va a REEMPLAZAR todos tus datos actuales (financieros y de vida diaria) con la copia del '+dateLabel+'.\n\nLo que tengas ahora se perderá si no lo has guardado en otra copia.\n\n¿Continuar?'))return;
+  if(!confirm('¿Estás completamente seguro? Esta acción no se puede deshacer.'))return;
+  fetch('https://www.googleapis.com/drive/v3/files/'+fileId+'?alt=media',{headers:{'Authorization':'Bearer '+GD.tok}})
+  .then(function(r){return r.json();})
+  .then(function(d){
+    if(!d.v){toast('❌ Copia inválida o dañada','#f43f5e');return;}
+    applyRemoteData(d);
+    renderDash();renderPers();renderBiz();
+    toast('✅ Restaurado desde la copia del '+dateLabel);
+    drvSave();
+  }).catch(function(){toast('❌ Error al restaurar la copia','#f43f5e');});
+}
+// Aplica un objeto de datos (de Drive o de una copia de respaldo) al estado local. Compartido por drvLoad y drvRestoreBackup.
+function applyRemoteData(d){
+  var keys=['pass','recoveryPin','contact','banks','goals','invs','loans','pTx','budgets','bizList','bizTx','bizInv','bizProfit','recs','patHistory','notes','transfers','events','tasks','lifeGoals','habits','habitLog','journal','menus','areas','work','school','negocioH'];
+  keys.forEach(function(k){if(d[k]!==undefined)sv(k,d[k]);});
+  S.pass=ld('pass','1234');S.recoveryPin=ld('recoveryPin',null);S.contact=ld('contact',{phone:'',email:''});
+  S.banks=ld('banks',[]);S.goals=ld('goals',[]);S.invs=ld('invs',[]);S.loans=ld('loans',[]);
+  S.pTx=ld('pTx',[]);S.budgets=ld('budgets',{});S.bizList=ld('bizList',[]);
+  S.bizTx=ld('bizTx',{});S.bizInv=ld('bizInv',{});S.bizProfit=ld('bizProfit',{});
+  S.recs=ld('recs',[]);
+  S.events=ld('events',[]);S.tasks=ld('tasks',[]);S.lifeGoals=ld('lifeGoals',[]);
+  S.habits=ld('habits',[]);S.habitLog=ld('habitLog',{});S.journal=ld('journal',[]);
+  S.menus=ld('menus',[]);S.areas=ld('areas',S.areas);
+  S.work=ld('work',S.work);S.school=ld('school',S.school);S.negocioH=ld('negocioH',S.negocioH);
+}
 function drvLoad(isAutoLoad){
   if(!GD.tok)return;
+  GD.syncing=true;
   if(!isAutoLoad) drvSt('⏳ Cargando datos de Drive...','#fbbf24');
   drvFindFile().then(function(file){
-    if(!file){drvSt('☁️ Conectado · Sin datos aún en Drive','#34d399');return;}
+    if(!file){GD.syncing=false;drvSt('☁️ Conectado · Sin datos aún en Drive','#34d399');return;}
     return fetch('https://www.googleapis.com/drive/v3/files/'+GD.fId+'?alt=media',{headers:{'Authorization':'Bearer '+GD.tok}})
     .then(function(r){
       if(r.status===401){var e=new Error('TOKEN_EXPIRED');e.code=401;throw e;}
       return r.json();
     })
     .then(function(d){
-      if(!d.v){drvSt('❌ Datos inválidos en Drive','#f43f5e');return;}
-      var keys=['pass','recoveryPin','contact','banks','goals','invs','loans','pTx','budgets','bizList','bizTx','bizInv','bizProfit','recs','patHistory','notes','transfers','events','tasks','lifeGoals','habits','habitLog','journal','menus','areas','work','school','negocioH'];
-      keys.forEach(function(k){if(d[k]!==undefined)sv(k,d[k]);});
-      // Reload state
-      S.pass=ld('pass','1234');S.recoveryPin=ld('recoveryPin',null);S.contact=ld('contact',{phone:'',email:''});
-      S.banks=ld('banks',[]);S.goals=ld('goals',[]);S.invs=ld('invs',[]);S.loans=ld('loans',[]);
-      S.pTx=ld('pTx',[]);S.budgets=ld('budgets',{});S.bizList=ld('bizList',[]);
-      S.bizTx=ld('bizTx',{});S.bizInv=ld('bizInv',{});S.bizProfit=ld('bizProfit',{});
-      S.recs=ld('recs',[]);
-      S.events=ld('events',[]);S.tasks=ld('tasks',[]);S.lifeGoals=ld('lifeGoals',[]);
-      S.habits=ld('habits',[]);S.habitLog=ld('habitLog',{});S.journal=ld('journal',[]);
-      S.menus=ld('menus',[]);S.areas=ld('areas',S.areas);
-      S.work=ld('work',S.work);S.school=ld('school',S.school);S.negocioH=ld('negocioH',S.negocioH);
+      if(!d.v){GD.syncing=false;drvSt('❌ Datos inválidos en Drive','#f43f5e');return;}
+      applyRemoteData(d);
       var sat=d.saved?new Date(d.saved).toLocaleString('es-MX',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+      GD.lastMod=file.modifiedTime||new Date().toISOString();
+      GD.syncing=false;
       drvSt('☁️ Sincronizado · '+sat,'#34d399');
       renderDash();renderPers();renderBiz();
-      toast('📥 Datos cargados desde Drive ✓');
+      toast(isAutoLoad?'🔄 Se actualizó con cambios nuevos de Drive':'📥 Datos cargados desde Drive ✓');
+      drvWeeklyBackupCheck();
     });
   }).catch(function(e){
+    GD.syncing=false;
     if(e&&e.code===401){
       drvTokenExpired(isAutoLoad);
     } else {
@@ -5510,7 +5697,7 @@ function renderAnaVida(){
   // Radar - life balance (uses ALL custom areas)
   dc('radarChart');var rc=ge('radarChart');
   if(rc&&S.areas.length>=3){
-    var radarAreas=S.areas.slice(0,10); // max 10 for readability
+    var radarAreas=S.areas; // muestra todas tus áreas
     var radarScores=radarAreas.map(function(ar){
       var gScore=S.lifeGoals.filter(function(g){return g.category===ar.id&&g.status==='active';}).length*15;
       var tScore=S.tasks.filter(function(t){return t.category===ar.id&&t.status==='done';}).length*5;
@@ -5532,7 +5719,7 @@ function renderAnaVida(){
           pointHoverRadius:7
         }]
       },
-      options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return ctx.label+': '+ctx.raw.toFixed(0)+' pts';}}}},scales:{r:{min:0,max:100,ticks:{display:false,stepSize:25},grid:{color:'rgba(255,255,255,.08)'},angleLines:{color:'rgba(255,255,255,.06)'},pointLabels:{color:'var(--soft)',font:{size:10}}}}}
+      options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return ctx.label+': '+ctx.raw.toFixed(0)+' pts';}}}},scales:{r:{min:0,max:100,ticks:{display:false,stepSize:25},grid:{color:'rgba(255,255,255,.08)'},angleLines:{color:'rgba(255,255,255,.06)'},pointLabels:{color:'var(--soft)',font:{size:9},centerPointLabels:false}}}}
     });
   }
 }
