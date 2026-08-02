@@ -869,6 +869,8 @@ Ir al mercado"></textarea></div>
     <div id="dAlerts" style="margin-bottom:4px"></div>
     <div id="dLifeAlerts" style="margin-bottom:4px"></div>
 
+    <button class="btn bp bfu" style="margin-bottom:14px" onclick="openCierreDia()">🌙 Cierre del día</button>
+
     <!-- GRID PRINCIPAL: 60% izquierda, 40% derecha -->
     <div class="d-desk-grid">
 
@@ -1001,8 +1003,6 @@ Ir al mercado"></textarea></div>
         <!-- Objetivos de vida activos -->
         <div class="sh"><div class="st">🎯 Objetivos activos</div><button class="btn bs bsm" onclick="showPg('pg-g')">Ver todos</button></div>
         <div id="dGoals" style="margin-bottom:8px"></div>
-
-        <button class="btn bp bfu" style="margin-top:6px" onclick="openCierreDia()">🌙 Cierre del día</button>
 
       </div><!-- /d-col-right -->
     </div><!-- /d-desk-grid -->
@@ -2629,7 +2629,7 @@ function renderPers(){
   var r=parseFloat(rate);
   var tip='';
   if(inc>0){
-    if(r>=20) tip='<div class="al als" style="margin-bottom:10px">✅ ¡Excelente! Ahorras '+rate+'% este mes. Considera invertir en CETES.</div>';
+    if(r>=20) tip='<div class="al als" style="margin-bottom:10px">✅ ¡Excelente! Ahorras '+rate+'% este mes. Considera aumentar tus inversiones o tu fondo de emergencia.</div>';
     else if(r>0) tip='<div class="al alw" style="margin-bottom:10px">💡 Ahorras '+rate+'%. Meta recomendada: 20%. Regla 50/30/20.</div>';
     else tip='<div class="al ald" style="margin-bottom:10px">⚠️ Gastos superan ingresos. Revisa gastos no esenciales.</div>';
   }
@@ -3672,11 +3672,71 @@ function renderAdv(){
   var invTot=S.invs.reduce(function(s,i){return s+(i.amount||0);},0);
   var r=parseFloat(rate);
   var tips=[];
+
+  // ── Ingresos y gastos: esta semana vs. la pasada, este mes vs. el pasado (personal + todos los negocios) ──
+  var allTx=S.pTx.slice();
+  S.bizList.forEach(function(b){(S.bizTx[b.id]||[]).forEach(function(t){allTx.push(t);});});
+  function sumRange(type,from,to){return allTx.filter(function(t){return t.type===type&&t.date>=from&&t.date<=to;}).reduce(function(s,t){return s+t.amount;},0);}
+  var hoyStr=(typeof todayStr==='function')?todayStr():dstr(new Date());
+  var wr=(typeof getWeekRange==='function')?getWeekRange(hoyStr):null;
+  if(wr){
+    var wrPrevStart=addDays(wr[0],-7), wrPrevEnd=addDays(wr[1],-7);
+    var semIng=sumRange('income',wr[0],wr[1]), semGas=sumRange('expense',wr[0],wr[1]);
+    var semIngPrev=sumRange('income',wrPrevStart,wrPrevEnd);
+    tips.push({i:'📆',t:'Esta semana: ingresos '+fmt(semIng)+' · gastos '+fmt(semGas)+' · neto '+fmt(semIng-semGas)+'.'});
+    if(semIngPrev>0){
+      var varSem=((semIng-semIngPrev)/semIngPrev*100);
+      tips.push({i:varSem>=0?'📈':'📉',t:'Tus ventas/ingresos '+(varSem>=0?'subieron':'bajaron')+' '+Math.abs(varSem).toFixed(1)+'% comparado con la semana pasada ('+fmt(semIngPrev)+' → '+fmt(semIng)+').'});
+    }
+  }
+  var mesIni=S.pY+'-'+((S.pM+1)<10?'0':'')+(S.pM+1)+'-01';
+  var mesFin=dstr(new Date(S.pY,S.pM+1,0));
+  var prevM=S.pM-1,prevY=S.pY; if(prevM<0){prevM=11;prevY--;}
+  var mesPrevIni=prevY+'-'+((prevM+1)<10?'0':'')+(prevM+1)+'-01';
+  var mesPrevFin=dstr(new Date(prevY,prevM+1,0));
+  var mesIngPrev=sumRange('income',mesPrevIni,mesPrevFin);
+  tips.push({i:'🗓️',t:'Este mes: ingresos '+fmt(inc)+' · gastos '+fmt(exp)+' · neto '+fmt(bal)+' ('+rate+'% de ahorro).'});
+  if(mesIngPrev>0){
+    var varMes=((inc-mesIngPrev)/mesIngPrev*100);
+    tips.push({i:varMes>=0?'📈':'📉',t:'Tus ventas/ingresos del mes '+(varMes>=0?'van '+varMes.toFixed(1)+'% arriba':'van '+Math.abs(varMes).toFixed(1)+'% abajo')+' comparado con '+MS[prevM]+' ('+fmt(mesIngPrev)+' → '+fmt(inc)+').'});
+  }
+
   if(inc===0) tips.push({i:'💡',t:'Registra tus ingresos del mes para obtener un análisis personalizado.'});
-  if(r<10&&inc>0) tips.push({i:'⚠️',t:'Tu tasa de ahorro es '+rate+'%. Meta recomendada: mínimo 20%. Aplica la regla 50/30/20: 50% necesidades, 30% deseos, 20% ahorro e inversión.'});
-  if(r>=20) tips.push({i:'✅',t:'¡Excelente! Ahorras '+rate+'% este mes. Considera invertir el excedente en CETES (rendimiento ~10% anual) para hacer crecer tu dinero.'});
+  if(r<10&&inc>0) tips.push({i:'⚠️',t:'Tu tasa de ahorro es '+rate+'%. Meta recomendada: mínimo 20%. Aplica la regla 50/30/20 sobre tu sueldo básico: 50% necesidades, 30% deseos, 20% ahorro e inversión.'});
   if(debtTot>inc*3&&inc>0) tips.push({i:'💳',t:'Tu deuda total ('+fmt(debtTot)+') es alta. Usa el método avalancha: paga primero las deudas con mayor tasa de interés para ahorrar más en el largo plazo.'});
-  if(!invTot) tips.push({i:'📊',t:'No tienes inversiones registradas. Los CETES son seguros y del gobierno mexicano. Puedes iniciar con $100 en cetesdirecto.com.'});
+
+  // ── Rezago de inversiones: cuánto deberías haber ahorrado/invertido este mes (20% del sueldo básico) vs lo que realmente aportaste ──
+  var SUELDO_CATS=['Salario','Quincena','Sueldo semanal'];
+  var sueldoBasico=ptx.filter(function(t){return t.type==='income'&&SUELDO_CATS.indexOf(t.category)>=0;}).reduce(function(s,t){return s+t.amount;},0);
+  var otrosIngresos=inc-sueldoBasico;
+  var ahorroMes=ptx.filter(function(t){return t.type==='expense'&&t.category==='Ahorro';}).reduce(function(s,t){return s+t.amount;},0);
+  if(sueldoBasico>0){
+    var metaAhorroMes=sueldoBasico*0.20;
+    var rezago=metaAhorroMes-ahorroMes;
+    if(rezago>0) tips.push({i:'📊',t:'Rezago de inversión este mes: te faltan '+fmt(rezago)+' para llegar al 20% de tu sueldo básico ('+fmt(metaAhorroMes)+' meta, llevas '+fmt(ahorroMes)+').'});
+    else tips.push({i:'✅',t:'Vas al día (o adelantado) con tu meta de ahorro del 20% de tu sueldo básico este mes — llevas '+fmt(ahorroMes)+' de '+fmt(metaAhorroMes)+'.'});
+  } else if(!invTot){
+    tips.push({i:'📊',t:'No tienes inversiones ni sueldo básico identificado todavía. Registra tus ingresos por categoría (Salario, Quincena...) para que este análisis se ajuste a ti.'});
+  }
+
+  // ── Fondo de emergencia: cuánto te falta ──
+  var avgExpFE=(function(){
+    var m3=[0,1,2].map(function(i){var mm=S.pM-i,yy=S.pY;while(mm<0){mm+=12;yy--;}return S.pTx.filter(function(t){return inMonth(t,mm,yy)&&t.type==='expense';}).reduce(function(s,t){return s+t.amount;},0);});
+    var v=m3.filter(function(x){return x>0;});
+    return v.length?v.reduce(function(s,x){return s+x;},0)/v.length:exp;
+  })();
+  var feTarget=avgExpFE*(S.emergencyFund.months||3);
+  var feActual=0;
+  if(S.emergencyFund.bankId){
+    var feB=S.banks.find(function(x){return x.id===S.emergencyFund.bankId;});
+    feActual=feB?(feB.balance||0):0;
+  }
+  if(feTarget>0){
+    var feFalta=feTarget-feActual;
+    if(feFalta>0) tips.push({i:'🛟',t:'Para tu fondo de emergencia ('+(S.emergencyFund.months||3)+' meses de gastos) te faltan '+fmt(feFalta)+' — llevas '+fmt(feActual)+' de '+fmt(feTarget)+'.'});
+    else tips.push({i:'✅',t:'Tu fondo de emergencia ya cubre tu meta de '+(S.emergencyFund.months||3)+' meses de gastos. 🎉'});
+  }
+
   if(!S.goals.length) tips.push({i:'🎯',t:'Define un fondo de emergencia como primera meta (3-6 meses de gastos). Es tu red de seguridad financiera ante imprevistos.'});
   S.bizList.forEach(function(biz){
     var fifo=calcBizFIFO(biz.id);
@@ -3765,7 +3825,10 @@ function renderLibertad(){
 function renderRegla503020(){
   var now=new Date(),cm=now.getMonth(),cy=now.getFullYear();
   var mTx=S.pTx.filter(function(t){return inMonth(t,cm,cy);});
-  var ingreso=mTx.filter(function(t){return t.type==='income';}).reduce(function(s,t){return s+t.amount;},0);
+  var SUELDO_CATS=['Salario','Quincena','Sueldo semanal'];
+  var sueldoBasico=mTx.filter(function(t){return t.type==='income'&&SUELDO_CATS.indexOf(t.category)>=0;}).reduce(function(s,t){return s+t.amount;},0);
+  var ingresoTotal=mTx.filter(function(t){return t.type==='income';}).reduce(function(s,t){return s+t.amount;},0);
+  var otrosIngresos=ingresoTotal-sueldoBasico;
   var NECESIDADES=['Vivienda','Servicios','Alimentación','Transporte','Salud','Educación','Deuda'];
   var DESEOS=['Entretenimiento','Ropa','Restaurantes','Personal','Tecnología','Otro gasto'];
   var AHORRO=['Ahorro'];
@@ -3773,19 +3836,26 @@ function renderRegla503020(){
   var nec=sumaCat(NECESIDADES), des=sumaCat(DESEOS), aho=sumaCat(AHORRO);
   var el=ge('reglaCard');
   if(!el) return;
-  if(ingreso<=0){ el.innerHTML='<div style="font-size:12px;color:var(--mut)">Registra tus ingresos del mes para ver esta comparativa.</div>'; return; }
-  var pNec=(nec/ingreso)*100, pDes=(des/ingreso)*100, pAho=(aho/ingreso)*100;
+  if(sueldoBasico<=0){ el.innerHTML='<div style="font-size:12px;color:var(--mut)">Registra ingresos con categoría "Salario", "Quincena" o "Sueldo semanal" para ver esta comparativa sobre tu sueldo básico.</div>'; return; }
+  var pNec=(nec/sueldoBasico)*100, pDes=(des/sueldoBasico)*100, pAho=(aho/sueldoBasico)*100;
   function fila(label,real,ideal,color){
     return '<div style="margin-bottom:10px">'+
       '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>'+label+'</span><span>Real: <b>'+real.toFixed(1)+'%</b> · Ideal: '+ideal+'%</span></div>'+
       '<div class="pbar"><div class="pbar-fill" style="width:'+Math.min(100,real)+'%;background:'+color+'"></div></div>'+
       '</div>';
   }
+  var gastoPersonalDisp=sueldoBasico-(sueldoBasico*0.5)-(sueldoBasico*0.2)-des;
   el.innerHTML=
     fila('🏠 Necesidades (renta, comida, transporte...)',pNec,50,'var(--bl)')+
     fila('🎉 Deseos (entretenimiento, ropa, gustos...)',pDes,30,'var(--pk)')+
     fila('💰 Ahorro e inversión',pAho,20,'var(--gr)')+
-    '<div style="font-size:11px;color:var(--soft);margin-top:6px">Basado en ingresos de '+MS[cm]+'. Las categorías sin clasificar no se cuentan en ningún bloque.</div>';
+    '<div style="font-size:11px;color:var(--soft);margin-top:6px">Basado solo en tu <b>sueldo básico</b> de '+MS[cm]+' ('+fmt(sueldoBasico)+'). Las categorías sin clasificar no se cuentan en ningún bloque.</div>'+
+    (otrosIngresos>0?'<div style="font-size:11px;color:var(--cy);margin-top:6px">💼 Otros ingresos este mes ('+fmt(otrosIngresos)+') se consideran <b>reinversión</b> — no entran en el 50/30/20, van hacia tu negocio o inversiones.</div>':'')+
+    '<div style="background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);border-radius:10px;padding:10px;margin-top:10px">'+
+      '<div style="font-size:11px;font-weight:700;color:var(--gr)">💵 Gasto personal disponible este mes</div>'+
+      '<div style="font-size:18px;font-weight:800;color:var(--gr);margin-top:2px">'+fmt(Math.max(0,gastoPersonalDisp))+'</div>'+
+      '<div style="font-size:10px;color:var(--mut);margin-top:2px">Después de apartar 50% necesidades + 20% ahorro/inversión de tu sueldo básico, y descontar lo ya gastado en deseos. Idealmente este dinero vive en una cuenta personal aparte de tus ahorros e inversiones.</div>'+
+    '</div>';
 }
 
 function renderGastosHormiga(){
@@ -4085,15 +4155,25 @@ function openCierreDia(){
   var hoy=todayStr();
   var manana=(typeof addDays==='function')?addDays(hoy,1):hoy;
 
-  var ventasHoy=S.pTx.filter(function(t){return t.date===hoy&&t.type==='income';}).reduce(function(s,t){return s+t.amount;},0);
-  var gastosHoy=S.pTx.filter(function(t){return t.date===hoy&&t.type==='expense';}).reduce(function(s,t){return s+t.amount;},0);
+  // Ventas = solo lo que entra por tus negocios. Ingresos personales (sueldo, regalos, etc.) van aparte.
+  var ventasHoy=0, gastoNegocioHoy=0;
+  var ventasPorNegocio=[];
   S.bizList.forEach(function(b){
+    var vB=0;
     (S.bizTx[b.id]||[]).forEach(function(t){
       if(t.date!==hoy)return;
-      if(t.type==='income')ventasHoy+=(t.amount||0); else gastosHoy+=(t.amount||0);
+      if(t.type==='income'){ventasHoy+=(t.amount||0);vB+=(t.amount||0);}
+      else{gastoNegocioHoy+=(t.amount||0);}
     });
+    if(vB>0)ventasPorNegocio.push({name:b.name,total:vB});
   });
+
+  var ingresosPersonalesTx=S.pTx.filter(function(t){return t.date===hoy&&t.type==='income';});
+  var ingresosHoy=ingresosPersonalesTx.reduce(function(s,t){return s+t.amount;},0);
+  var gastoPersonalHoy=S.pTx.filter(function(t){return t.date===hoy&&t.type==='expense';}).reduce(function(s,t){return s+t.amount;},0);
+
   var gastoComida=S.menus.filter(function(m){return m.fecha===hoy;}).reduce(function(s,m){return s+(Number(m.costo)||0);},0);
+  var netoDia=(ventasHoy+ingresosHoy)-(gastoNegocioHoy+gastoPersonalHoy+gastoComida);
 
   var pendientes=S.tasks.filter(function(t){return t.status!=='done';});
   var tareasHoy=pendientes.filter(function(t){return t.dueDate===hoy;});
@@ -4103,11 +4183,19 @@ function openCierreDia(){
   var turnoLbl=turnoManana?(turnoManana.label+(turnoManana.start?' ('+turnoManana.start+'–'+turnoManana.end+')':'')):'Sin turno configurado';
   var turnoColor=turnoManana&&turnoManana.color?turnoManana.color:'var(--soft)';
 
-  var html='<div class="g4" style="margin-bottom:12px">'+
-    '<div class="sc"><div class="sl">Ventas hoy</div><div class="sv" style="color:var(--gr)">'+fmt(ventasHoy)+'</div></div>'+
-    '<div class="sc"><div class="sl">Gastos hoy</div><div class="sv" style="color:var(--rd)">'+fmt(gastosHoy)+'</div></div>'+
-    '<div class="sc"><div class="sl">Comida hoy</div><div class="sv" style="color:var(--go)">'+fmt(gastoComida)+'</div></div>'+
-    '<div class="sc"><div class="sl">Neto del día</div><div class="sv" style="color:'+((ventasHoy-gastosHoy)>=0?'var(--gr)':'var(--rd)')+'">'+fmt(ventasHoy-gastosHoy)+'</div></div>'+
+  var html='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--soft);margin-bottom:6px">💰 Dinero de hoy</div>';
+  html+='<div class="g4" style="margin-bottom:6px">'+
+    '<div class="sc"><div class="sl">🏪 Ventas del negocio</div><div class="sv" style="color:var(--gr)">'+fmt(ventasHoy)+'</div></div>'+
+    '<div class="sc"><div class="sl">💼 Otros ingresos</div><div class="sv" style="color:var(--cy)">'+fmt(ingresosHoy)+'</div></div>'+
+    '<div class="sc"><div class="sl">🏪 Gasto del negocio</div><div class="sv" style="color:var(--rd)">'+fmt(gastoNegocioHoy)+'</div></div>'+
+    '<div class="sc"><div class="sl">🙋 Gasto personal</div><div class="sv" style="color:var(--rd)">'+fmt(gastoPersonalHoy)+'</div></div>'+
+  '</div>';
+  if(ventasPorNegocio.length>1){
+    html+='<div style="font-size:11px;color:var(--soft);margin-bottom:6px">'+ventasPorNegocio.map(function(v){return v.name+': '+fmt(v.total);}).join(' · ')+'</div>';
+  }
+  html+='<div class="g4" style="margin-bottom:12px">'+
+    '<div class="sc"><div class="sl">🍳 Comida hoy</div><div class="sv" style="color:var(--go)">'+fmt(gastoComida)+'</div></div>'+
+    '<div class="sc"><div class="sl">Neto del día</div><div class="sv" style="color:'+(netoDia>=0?'var(--gr)':'var(--rd)')+'">'+fmt(netoDia)+'</div></div>'+
   '</div>';
 
   html+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--soft);margin:10px 0 6px">✅ Tareas</div>';
