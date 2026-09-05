@@ -1013,6 +1013,11 @@ Ir al mercado"></textarea></div>
     <div class="mnav"><button class="mb" onclick="chPM(-1)">‹</button><span class="ml" id="pML"></span><button class="mb" onclick="chPM(1)">›</button></div>
     <div class="g4" id="pStats"></div>
     <div id="pProg"></div><div id="pTip"></div>
+    <div class="sh"><div class="st">📊 Ingresos vs Gastos — este mes</div></div>
+    <div class="card" style="padding:10px 12px 8px;margin-bottom:10px">
+      <canvas id="chartLiveIE" height="110"></canvas>
+      <div id="liveIELbl" style="font-size:11px;margin-top:8px;text-align:center"></div>
+    </div>
     <div class="sh"><div class="st">🔁 Movimientos fijos</div><button class="btn bs bsm" onclick="openRec(null)">+ Agregar</button></div>
     <div id="recList"></div>
     <div class="sh"><div class="st">🔮 Proyección próximos 30 días</div></div>
@@ -2601,6 +2606,31 @@ function editPTx(id){
   setTimeout(function(){setV('pCatSel',t.category);},60);
   window.scrollTo(0,300);
 }
+function renderLiveIE(inc,exp){
+  var c=ge('chartLiveIE'); if(!c||typeof Chart==='undefined'||!c.getContext) return;
+  destroyChart('chartLiveIE');
+  var limite=Object.keys(S.budgets||{}).reduce(function(s,k){return s+(S.budgets[k]||0);},0);
+  var datasets=[{label:'Este mes',data:[inc,exp],backgroundColor:['rgba(16,185,129,.35)','rgba(244,63,94,.3)'],borderColor:['#10b981','#f43f5e'],borderWidth:2,borderRadius:6,maxBarThickness:70}];
+  if(limite>0){
+    datasets.push({type:'line',label:'Tu límite de gasto',data:[limite,limite],borderColor:'#fbbf24',borderDash:[6,4],borderWidth:2,pointRadius:0,fill:false});
+  }
+  _charts['chartLiveIE']=new Chart(c.getContext('2d'),{
+    type:'bar',
+    data:{labels:['Ingresos','Gastos'],datasets:datasets},
+    options:{responsive:true,plugins:{legend:{display:limite>0,labels:{color:'#8fa3b1',font:{size:10}}},tooltip:{callbacks:{label:function(ctx){return ctx.dataset.label+': '+fmt(ctx.raw);}}}},scales:{x:{ticks:{color:'#8fa3b1',font:{size:12,weight:'bold'}},grid:{display:false}},y:{beginAtZero:true,ticks:{color:'#8fa3b1',font:{size:9},callback:function(v){return '$'+v.toLocaleString();}},grid:{color:'rgba(255,255,255,.04)'}}}}
+  });
+  var lbl=ge('liveIELbl');
+  if(lbl){
+    if(limite>0){
+      var pct=((exp/limite)*100).toFixed(0);
+      lbl.innerHTML=exp>=limite
+        ? '<span style="color:var(--rd);font-weight:700">⚠️ Ya superaste tu límite de gasto ('+pct+'%)</span>'
+        : '<span style="color:var(--soft)">Llevas <b>'+pct+'%</b> de tu límite de gasto de '+fmt(limite)+' este mes</span>';
+    } else {
+      lbl.innerHTML='<span style="color:var(--mut)">Define presupuestos por categoría en Ajustes → Presupuestos para ver aquí tu línea de límite</span>';
+    }
+  }
+}
 function renderPers(){
   renderProyeccion();
   upPCats(); upBankSel();
@@ -2610,6 +2640,7 @@ function renderPers(){
   var exp=txs.filter(function(t){return t.type==='expense';}).reduce(function(s,t){return s+t.amount;},0);
   var bal=inc-exp;
   var rate=inc>0?((bal/inc)*100).toFixed(1):'0';
+  renderLiveIE(inc,exp);
 
   var ps=ge('pStats');
   if(ps) ps.innerHTML=
